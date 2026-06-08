@@ -1,0 +1,42 @@
+.workflow-panel { display: flex; flex-direction: column; gap: 8px; }
+
+.wf-row {
+  background: #fff; border: 1.5px solid #E5E5E5;
+  border-radius: 10px; overflow: hidden; transition: all .2s;
+}
+.wf-row.wf-direct { border-color: #EF5350; background: #FFF8F8; }
+.wf-row.wf-indirect { border-color: #FFC107; background: #FFFDF0; }
+.wf-row.wf-none { opacity: .5; }
+.wf-row.wf-open { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+
+.wf-header {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; background: none; border: none; text-align: left;
+}
+.wf-name { font-size: 13px; font-weight: 700; color: #1E1B3C; flex: 1; }
+.wf-badge {
+  font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+}
+.wf-badge.direct { background: #FFEBEE; color: #C62828; }
+.wf-badge.indirect { background: #FFF8E1; color: #7A5000; }
+.wf-chevron { font-size: 10px; color: #9AA7B4; }
+
+.wf-steps {
+  padding: 0 16px 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+}
+.step-row { display: flex; align-items: center; gap: 4px; }
+.step-arrow { color: #C0C8D4; font-size: 12px; }
+.step-chip {
+  padding: 4px 10px; border-radius: 5px; font-size: 11px;
+  border: 1px solid #E5E5E5; background: #fff; color: #3D3D5C; white-space: nowrap;
+}
+.step-api    { background: #E3F2FD; border-color: #90CAF9; color: #1565C0; }
+.step-domain { background: #F3E5F5; border-color: #CE93D8; color: #6A1B9A; }
+.step-kafka  { background: #FFF8E1; border-color: #FFC107; color: #7A5000; }
+.step-bg     { background: #FFF3E0; border-color: #FF9800; color: #BF360C; }
+.step-ext    { background: #E8F5E9; border-color: #66BB6A; color: #1B5E20; }
+.step-violation {
+  background: #FFEBEE; border-color: #EF5350; color: #B71C1C;
+  font-weight: 600; border-width: 2px;
+}

@@ -1,0 +1,39 @@
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: 56px;
+  background: #fff; border-bottom: 1px solid #E5E5E5;
+  position: sticky; top: 0; z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+.logo-s {
+  width: 24px; height: 24px; background: #F15A24;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 900; color: #fff; border-radius: 3px;
+}
+.logo-text { font-size: 16px; font-weight: 700; color: #1E1B3C; }
+.service-badge {
+  background: #F4F7FC; border: 1px solid #D0DCF0;
+  border-radius: 20px; padding: 2px 10px;
+  font-size: 11px; font-weight: 600; color: #5B6F8A;
+  font-family: monospace;
+}
+.header-meta { font-size: 11px; color: #9AA7B4; }
+
+.main { padding: 24px 28px; display: flex; flex-direction: column; gap: 32px; }
+.section-title {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: #9AA7B4; margin-bottom: 14px;
+}
+
+.loading {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100vh; gap: 16px; color: #5B6F8A;
+}
+.spinner {
+  width: 32px; height: 32px; border: 3px solid #E5E5E5;
+  border-top-color: #F15A24; border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

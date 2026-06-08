@@ -1,0 +1,13 @@
+.int-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.int-card { background: #fff; border: 1.5px solid #E5E5E5; border-radius: 10px; padding: 14px; }
+.int-card.kafka-in  { border-color: #FFE082; background: #FFFDE7; }
+.int-card.kafka-out { border-color: #FFC107; background: #FFF8E1; }
+.int-card.http      { border-color: #90CAF9; background: #E3F2FD; }
+.int-card.bg        { border-color: #FF9800; background: #FFF3E0; }
+.int-card h4 { font-size: 11px; font-weight: 700; color: #5B6F8A; margin-bottom: 10px; }
+.int-card ul { list-style: none; }
+.int-card ul li {
+  font-size: 11px; color: #3D3D5C; padding: 2px 0 2px 10px;
+  position: relative; line-height: 1.6;
+}
+.int-card ul li::before { content: '·'; position: absolute; left: 0; color: #C0C8D4; }

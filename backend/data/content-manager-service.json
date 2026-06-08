@@ -1,0 +1,650 @@
+{
+  "service": "content-manager-service",
+  "analyzedAt": "2026-06-05",
+  "domains": [
+    {
+      "id": "content-item",
+      "name": "Content Item",
+      "icon": "\ud83d\udcc4",
+      "health": "anemic",
+      "operations": [
+        "Upload",
+        "Rename",
+        "Move",
+        "Delete",
+        "Checkout",
+        "Checkin",
+        "Batch edit"
+      ],
+      "keywords": [
+        "file",
+        "upload",
+        "content",
+        "checkout",
+        "rename",
+        "folder",
+        "item"
+      ],
+      "dddTarget": {
+        "aggregate": "ContentItemEntity",
+        "identity": "ContentObjectId + TeamSiteId",
+        "lifecycle": [
+          "uploading",
+          "active",
+          "expired",
+          "deleted"
+        ],
+        "valueObjects": [
+          "ContentStatus",
+          "TeamSiteId",
+          "WorkflowStatus"
+        ],
+        "childEntities": [
+          "FolderEntity"
+        ],
+        "invariants": [
+          "Cannot activate unless status is READY or UPLOAD_COMPLETE",
+          "Cannot delete while a workflow approval is pending",
+          "Cannot checkout if already checked out by another user"
+        ],
+        "commands": [
+          {
+            "cmd": "Upload(userId, request)",
+            "event": "ContentUploaded"
+          },
+          {
+            "cmd": "Activate(userId)",
+            "event": "ContentActivated"
+          },
+          {
+            "cmd": "ScheduleActivation(userId, at)",
+            "event": "ActivationScheduled"
+          },
+          {
+            "cmd": "Expire(reason)",
+            "event": "ContentExpired"
+          },
+          {
+            "cmd": "Checkout(userId)",
+            "event": "ContentCheckedOut"
+          },
+          {
+            "cmd": "Delete(userId)",
+            "event": "ContentDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "version",
+      "name": "Version",
+      "icon": "\ud83d\udd16",
+      "health": "anemic",
+      "operations": [
+        "Create version",
+        "Promote",
+        "Expire version",
+        "Track status"
+      ],
+      "keywords": [
+        "version",
+        "promote",
+        "versioning",
+        "major",
+        "minor"
+      ],
+      "dddTarget": {
+        "aggregate": "ContentVersionEntity",
+        "identity": "versionId",
+        "lifecycle": [
+          "uploading",
+          "processing",
+          "ready",
+          "promoted",
+          "expired"
+        ],
+        "valueObjects": [
+          "VersionStatus",
+          "RenditionInfo"
+        ],
+        "childEntities": [
+          "RenditionEntity"
+        ],
+        "invariants": [
+          "Status transitions forward-only: uploading \u2192 processing \u2192 ready",
+          "Cannot promote a version whose status is not READY",
+          "Cannot create a new version while checkout is active"
+        ],
+        "commands": [
+          {
+            "cmd": "BeginUpload(isVideo, isOfficeDoc)",
+            "event": "VersionUploadStarted"
+          },
+          {
+            "cmd": "MarkRenditionProcessed(info)",
+            "event": "VersionProcessed"
+          },
+          {
+            "cmd": "Promote(userId)",
+            "event": "VersionPromoted"
+          },
+          {
+            "cmd": "Expire()",
+            "event": "VersionExpired"
+          }
+        ]
+      }
+    },
+    {
+      "id": "activation",
+      "name": "Activation & Publish",
+      "icon": "\ud83d\ude80",
+      "health": "partial",
+      "operations": [
+        "Direct activate",
+        "Schedule activation",
+        "Publish",
+        "Approval gate"
+      ],
+      "keywords": [
+        "activate",
+        "publish",
+        "schedule",
+        "approval",
+        "sbp",
+        "profile"
+      ],
+      "dddTarget": {
+        "aggregate": "Coordinated by ActivationDomainService",
+        "identity": "N/A \u2014 cross-aggregate",
+        "lifecycle": [
+          "none"
+        ],
+        "valueObjects": [],
+        "childEntities": [],
+        "invariants": [
+          "Can only activate if version is READY and actor has ACTIVATE permission"
+        ],
+        "commands": [
+          {
+            "cmd": "Activate(userId, contentId)",
+            "event": "ContentActivated"
+          },
+          {
+            "cmd": "Publish(userId, contentId)",
+            "event": "ContentPublished"
+          }
+        ]
+      }
+    },
+    {
+      "id": "external-sync",
+      "name": "External Sync",
+      "icon": "\ud83d\udd04",
+      "health": "anemic",
+      "operations": [
+        "Google Drive sync",
+        "Cloud content",
+        "Sync tracking",
+        "MicroApp"
+      ],
+      "keywords": [
+        "sync",
+        "google",
+        "drive",
+        "cloud",
+        "external",
+        "tiled"
+      ],
+      "dddTarget": {
+        "aggregate": "ExternalSyncEntity",
+        "identity": "syncConfigId",
+        "lifecycle": [
+          "idle",
+          "running",
+          "completed",
+          "failed"
+        ],
+        "valueObjects": [
+          "SyncState",
+          "SyncSource"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Cannot Start() if state is already Running",
+          "Cannot Complete() if state is not Running",
+          "Cannot Fail() if state is already Completed"
+        ],
+        "commands": [
+          {
+            "cmd": "Configure(userId, config)",
+            "event": "SyncConfigured"
+          },
+          {
+            "cmd": "Start(userId)",
+            "event": "SyncStarted"
+          },
+          {
+            "cmd": "Complete(result)",
+            "event": "SyncCompleted"
+          },
+          {
+            "cmd": "Fail(reason)",
+            "event": "SyncFailed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "expiration",
+      "name": "Expiration",
+      "icon": "\u23f1",
+      "health": "partial",
+      "operations": [
+        "Set expiration",
+        "Background runner",
+        "Expiration notifications"
+      ],
+      "keywords": [
+        "expire",
+        "expiration",
+        "schedule",
+        "notification",
+        "date"
+      ],
+      "dddTarget": {
+        "aggregate": "ExpirationPolicyEntity",
+        "identity": "contentId",
+        "lifecycle": [
+          "unset",
+          "scheduled",
+          "triggered",
+          "cancelled"
+        ],
+        "valueObjects": [
+          "ExpirationDate"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "ExpirationDate cannot be in the past",
+          "Cannot schedule expiration while a workflow approval is pending"
+        ],
+        "commands": [
+          {
+            "cmd": "Schedule(userId, expiresAt)",
+            "event": "ExpirationScheduled"
+          },
+          {
+            "cmd": "Cancel(userId)",
+            "event": "ExpirationCancelled"
+          },
+          {
+            "cmd": "Trigger()",
+            "event": "ContentExpired"
+          }
+        ]
+      }
+    },
+    {
+      "id": "custom-properties",
+      "name": "Custom Properties",
+      "icon": "\ud83c\udff7",
+      "health": "good",
+      "operations": [
+        "Define properties",
+        "Assign to content",
+        "Background sync",
+        "Publish to Kafka"
+      ],
+      "keywords": [
+        "property",
+        "metadata",
+        "tag",
+        "custom",
+        "attribute"
+      ],
+      "dddTarget": {
+        "aggregate": "CustomPropertySetEntity",
+        "identity": "contentId",
+        "lifecycle": [
+          "none"
+        ],
+        "valueObjects": [
+          "CustomPropertyValue",
+          "PropertyDefinitionRef"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Values must conform to their property definition type",
+          "Required properties cannot be cleared"
+        ],
+        "commands": [
+          {
+            "cmd": "Apply(values)",
+            "event": "CustomPropertiesChanged"
+          },
+          {
+            "cmd": "BulkSetAITags(contentId, tags)",
+            "event": "AITagsApplied"
+          }
+        ]
+      }
+    },
+    {
+      "id": "permission",
+      "name": "Permission",
+      "icon": "\ud83d\udd10",
+      "health": "anemic",
+      "operations": [
+        "Granular permissions",
+        "Unique permissions",
+        "TeamSite membership"
+      ],
+      "keywords": [
+        "permission",
+        "access",
+        "security",
+        "auth",
+        "role",
+        "teamsite"
+      ],
+      "dddTarget": {
+        "aggregate": "PermissionEntity",
+        "identity": "contentId + principalId",
+        "lifecycle": [
+          "none"
+        ],
+        "valueObjects": [
+          "AccessLevel",
+          "PrincipalId"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Cannot grant OWNER and VIEWER simultaneously",
+          "Unique permissions cannot apply to inherited items",
+          "Cannot revoke the last OWNER of a TeamSite"
+        ],
+        "commands": [
+          {
+            "cmd": "Grant(grantor, principal, level)",
+            "event": "PermissionGranted"
+          },
+          {
+            "cmd": "Revoke(revoker, principalId)",
+            "event": "PermissionRevoked"
+          },
+          {
+            "cmd": "SetUnique(adminId)",
+            "event": "PermissionSetUnique"
+          }
+        ]
+      }
+    },
+    {
+      "id": "collaboration",
+      "name": "Collaboration",
+      "icon": "\ud83e\udd1d",
+      "health": "good",
+      "operations": [
+        "Annotations",
+        "Workflow approval",
+        "LiveDoc",
+        "Share",
+        "Barcode"
+      ],
+      "keywords": [
+        "comment",
+        "annotation",
+        "review",
+        "workflow",
+        "share",
+        "collaborate"
+      ],
+      "dddTarget": {
+        "aggregate": "Delegated to CMS \u2014 no local aggregate needed",
+        "identity": "N/A",
+        "lifecycle": [
+          "none"
+        ],
+        "valueObjects": [
+          "WorkflowStatus"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "WorkflowStatus on ContentItemEntity blocks deletion while SUBMITTED"
+        ],
+        "commands": [
+          {
+            "cmd": "SubmitForReview(userId)",
+            "event": "WorkflowSubmitted"
+          },
+          {
+            "cmd": "Approve(reviewerId)",
+            "event": "WorkflowApproved"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rendition",
+      "name": "Rendition & Media",
+      "icon": "\ud83c\udfac",
+      "health": "partial",
+      "operations": [
+        "Rendition tracking",
+        "Cracking pipeline",
+        "Virus scan",
+        "Augmentation"
+      ],
+      "keywords": [
+        "rendition",
+        "video",
+        "media",
+        "thumbnail",
+        "preview",
+        "cracking"
+      ],
+      "dddTarget": {
+        "aggregate": "RenditionEntity (child of ContentVersionEntity)",
+        "identity": "renditionId",
+        "lifecycle": [
+          "processing",
+          "ready",
+          "failed"
+        ],
+        "valueObjects": [
+          "RenditionStatus"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Status: processing \u2192 ready | failed (no reversal)"
+        ],
+        "commands": [
+          {
+            "cmd": "MarkReady(renditionInfo)",
+            "event": "RenditionReady"
+          },
+          {
+            "cmd": "MarkFailed(reason)",
+            "event": "RenditionFailed"
+          }
+        ]
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "id": "upload-activation",
+      "name": "Content Upload & Activation",
+      "domains": [
+        "content-item",
+        "version",
+        "rendition",
+        "activation"
+      ],
+      "steps": [
+        {
+          "label": "POST /files (FileWriter.Upload)",
+          "type": "api"
+        },
+        {
+          "label": "Create ContentObject (SQL)",
+          "type": "domain"
+        },
+        {
+          "label": "Create Version record",
+          "type": "domain"
+        },
+        {
+          "label": "Kafka OUT: cracking-pipeline",
+          "type": "kafka"
+        },
+        {
+          "label": "CrackingPipelineListener \u2192 rendition",
+          "type": "background"
+        },
+        {
+          "label": "ActivationWriter (45 checkpoints)",
+          "type": "violation"
+        },
+        {
+          "label": "SBPProfileWriter.UpdateFileToProfile",
+          "type": "domain"
+        },
+        {
+          "label": "Kafka OUT: content-event",
+          "type": "kafka"
+        }
+      ]
+    },
+    {
+      "id": "external-sync-flow",
+      "name": "External Sync (Google Drive)",
+      "domains": [
+        "external-sync",
+        "version",
+        "content-item"
+      ],
+      "steps": [
+        {
+          "label": "External source (Google Drive)",
+          "type": "external"
+        },
+        {
+          "label": "ExternalSyncWriter.SyncFile",
+          "type": "api"
+        },
+        {
+          "label": "ExternalSyncReader sets .State \u26a0",
+          "type": "violation"
+        },
+        {
+          "label": "SyncIndicatorBGService tracks",
+          "type": "background"
+        },
+        {
+          "label": "itemVersion.Status set in Writer \u26a0",
+          "type": "violation"
+        },
+        {
+          "label": "Kafka OUT: library-content-references",
+          "type": "kafka"
+        }
+      ]
+    },
+    {
+      "id": "expiration-flow",
+      "name": "Content Expiration",
+      "domains": [
+        "expiration",
+        "content-item"
+      ],
+      "steps": [
+        {
+          "label": "PUT expiration date (SQL)",
+          "type": "api"
+        },
+        {
+          "label": "Kafka IN: expiration-notification-setting",
+          "type": "kafka"
+        },
+        {
+          "label": "ExpirationBGService polls 20s",
+          "type": "background"
+        },
+        {
+          "label": "ExpirationWriter.ExpireContent",
+          "type": "domain"
+        },
+        {
+          "label": "Kafka OUT: content-event",
+          "type": "kafka"
+        }
+      ]
+    },
+    {
+      "id": "publish-flow",
+      "name": "Publish / Approval Workflow",
+      "domains": [
+        "activation",
+        "permission",
+        "content-item"
+      ],
+      "steps": [
+        {
+          "label": "POST publish (PublishWriter)",
+          "type": "api"
+        },
+        {
+          "label": "PublishGate permission check",
+          "type": "domain"
+        },
+        {
+          "label": "SQLPublishOrchestrator checkpoint chain",
+          "type": "domain"
+        },
+        {
+          "label": "FilePublishableCheckpoint validates",
+          "type": "domain"
+        },
+        {
+          "label": "Status updated in Writer \u26a0",
+          "type": "violation"
+        },
+        {
+          "label": "Kafka OUT: content-event",
+          "type": "kafka"
+        }
+      ]
+    }
+  ],
+  "integrations": {
+    "kafkaIn": [
+      "cracking-pipeline-topic",
+      "blob-virus-scan.scan-result",
+      "static-augmentation",
+      "expiration-notification-setting"
+    ],
+    "kafkaOut": [
+      "content-event-topic",
+      "cms.custom-property",
+      "library-content-references.v4",
+      "data-collection"
+    ],
+    "http": [
+      "CMS",
+      "UMS",
+      "VFS",
+      "BlobStorage",
+      "CustomObject (COS)",
+      "LaunchDarkly"
+    ],
+    "background": [
+      "ScheduleActivateBGService",
+      "ExpirationBGService",
+      "CustomPropertyBGService",
+      "CrackingPipelineListener",
+      "SyncIndicatorBGService"
+    ]
+  }
+}

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DomainCompose Studio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F4F7FC;color:#1E1B3C;min-height:100vh}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;background:#fff;border-bottom:1px solid #E5E5E5;position:sticky;top:0;z-index:100;gap:16px}
+.hdr-l{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo-s{width:24px;height:24px;background:#F15A24;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff}
+.logo-txt{font-size:16px;font-weight:700;color:#1E1B3C}
+.svc-badge{background:#F4F7FC;border:1px solid #D0DCF0;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;color:#5B6F8A;font-family:monospace}
+
+/* VIEW TOGGLE */
+.view-toggle{display:flex;background:#F4F7FC;border:1px solid #E5E5E5;border-radius:8px;padding:3px;gap:2px}
+.vt-btn{padding:4px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:transparent;color:#9AA7B4}
+.vt-btn.active{background:#fff;color:#1E1B3C;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.vt-btn.refactor.active{background:#F15A24;color:#fff}
+
+.hdr-r{font-size:11px;color:#9AA7B4;flex-shrink:0}
+
+/* IMPACT BAR */
+.impact-bar{background:#fff;border-bottom:1px solid #E5E5E5;padding:10px 24px;display:flex;flex-direction:column;gap:8px}
+.impact-form{display:flex;align-items:center;gap:8px}
+.impact-input{flex:1;height:36px;border:1.5px solid #D0DCF0;border-radius:8px;padding:0 12px;font-size:13px;color:#1E1B3C;outline:none;transition:border-color .15s}
+.impact-input:focus{border-color:#F15A24}
+.impact-btn{height:36px;padding:0 16px;background:#F15A24;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.impact-btn:hover{opacity:.88}
+.impact-clear{height:36px;padding:0 12px;background:transparent;color:#9AA7B4;border:1px solid #E5E5E5;border-radius:8px;font-size:12px;cursor:pointer}
+.impact-summary{display:flex;gap:10px;flex-wrap:wrap}
+.badge{padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.badge.direct{background:#FFEBEE;color:#C62828}
+.badge.indirect{background:#FFF8E1;color:#7A5000}
+.badge.none-b{background:#F5F5F5;color:#888}
+
+/* MAIN LAYOUT */
+.layout{display:flex;min-height:calc(100vh - 52px)}
+.sidebar{width:220px;flex-shrink:0;background:#fff;border-right:1px solid #E5E5E5;padding:16px 0;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
+.sb-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#9AA7B4;padding:0 16px;margin-bottom:8px}
+.sb-item{display:flex;align-items:center;gap:8px;padding:8px 16px;cursor:pointer;transition:background .15s;border-left:3px solid transparent;font-size:13px;color:#3D3D5C}
+.sb-item:hover{background:#F4F7FC}
+.sb-item.selected{background:#FFF3EF;border-left-color:#F15A24;color:#1E1B3C;font-weight:600}
+.sb-item.impact-direct{background:#FFF5F5}
+.sb-item.impact-indirect{background:#FFFDE7}
+.sb-icon{font-size:16px;flex-shrink:0}
+.sb-health{font-size:9px;margin-left:auto;padding:1px 5px;border-radius:3px}
+.health-good{background:#E8F5E9;color:#2E7D32}
+.health-partial{background:#FFF8E1;color:#7A5000}
+.health-anemic{background:#FFEBEE;color:#C62828}
+
+.content{flex:1;padding:24px;overflow:auto;min-width:0}
+.sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#9AA7B4;margin-bottom:14px}
+
+/* DOMAIN GRID */
+.domain-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.dc{background:#fff;border:1.5px solid #E5E5E5;border-radius:10px;padding:12px;transition:all .25s;cursor:pointer}
+.dc:hover{border-color:#D0DCF0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.dc.selected{border-color:#F15A24;box-shadow:0 0 0 3px rgba(241,90,36,.12)}
+.dc.d-direct{border-color:#EF5350;background:#FFF5F5;transform:translateY(-2px);box-shadow:0 0 0 3px rgba(239,83,80,.12)}
+.dc.d-indirect{border-color:#FFC107;background:#FFFDE7}
+.dc.d-none{opacity:.4}
+.dc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.dc-icon{font-size:18px}
+.dc-name{font-size:12px;font-weight:700;flex:1}
+.dc-ibadge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px}
+.dc-ibadge.direct{background:#FFEBEE;color:#C62828}
+.dc-ibadge.indirect{background:#FFF8E1;color:#7A5000}
+.dc-health{font-size:10px;color:#9AA7B4;margin-bottom:6px}
+.dc-ops{list-style:none;display:flex;flex-direction:column;gap:2px}
+.dc-ops li{font-size:10.5px;color:#5B6F8A;padding-left:10px;position:relative;line-height:1.5}
+.dc-ops li::before{content:'·';position:absolute;left:0;color:#D0DCF0}
+.dc-ops li.op-hit{color:#C62828;font-weight:600}
+.dc-ops li.op-hit::before{color:#EF5350}
+.dc-ops li.op-more{color:#C0C8D4;font-style:italic}
+
+/* DOMAIN DETAIL PANEL */
+.detail-panel{background:#fff;border:1.5px solid #E5E5E5;border-radius:12px;padding:20px;margin-bottom:24px}
+.dp-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.dp-icon{font-size:28px}
+.dp-title{font-size:18px;font-weight:700}
+.dp-close{margin-left:auto;background:none;border:none;cursor:pointer;color:#9AA7B4;font-size:18px;padding:4px}
+.dp-tabs{display:flex;gap:0;border-bottom:1px solid #E5E5E5;margin-bottom:16px}
+.dp-tab{padding:8px 16px;border:none;background:none;font-size:13px;color:#9AA7B4;cursor:pointer;border-bottom:2px solid transparent;font-weight:600}
+.dp-tab.active{color:#F15A24;border-bottom-color:#F15A24}
+
+/* CURRENT TAB */
+.ops-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.op-chip{padding:4px 10px;background:#F4F7FC;border:1px solid #E5E5E5;border-radius:6px;font-size:11px;color:#3D3D5C}
+.op-chip.hit{background:#FFEBEE;border-color:#EF9A9A;color:#C62828;font-weight:600}
+
+/* REFACTOR / DDD TARGET TAB */
+.ddd-card{border:1.5px solid #D0DCF0;border-radius:10px;overflow:hidden;margin-bottom:12px}
+.ddd-card-hdr{background:#1E1B3C;color:#fff;padding:10px 14px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.ddd-card-hdr span{font-size:10px;opacity:.6;font-weight:400;font-family:monospace}
+.ddd-body{padding:14px;display:flex;flex-direction:column;gap:12px}
+.ddd-section{display:flex;flex-direction:column;gap:6px}
+.ddd-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9AA7B4}
+.lifecycle{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.ls{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid #D0DCF0;background:#F4F7FC;color:#3D3D5C}
+.ls-arr{color:#C0C8D4;font-size:11px}
+.vo-pills{display:flex;flex-wrap:wrap;gap:5px}
+.vo-pill{font-size:10px;padding:2px 8px;border-radius:10px;background:#E8F4FD;border:1px solid #90CAF9;color:#1565C0}
+.inv-list{list-style:none;display:flex;flex-direction:column;gap:5px}
+.inv-list li{font-size:12px;color:#3D3D5C;padding-left:14px;position:relative;line-height:1.5}
+.inv-list li::before{content:'⚠';position:absolute;left:0;font-size:10px;top:2px}
+.cmd-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.cmd-table tr{border-bottom:1px solid #F0F0F0}
+.cmd-table tr:last-child{border-bottom:none}
+.cmd-table td{padding:5px 8px;vertical-align:top}
+.cmd-table td:first-child{font-family:monospace;color:#1565C0;white-space:nowrap}
+.cmd-table td:last-child{color:#2E7D32;font-weight:600}
+
+/* WORKFLOW PANEL */
+.wf-panel{display:flex;flex-direction:column;gap:8px}
+.wf-row{background:#fff;border:1.5px solid #E5E5E5;border-radius:10px;overflow:hidden;transition:all .2s}
+.wf-row.wf-direct{border-color:#EF5350;background:#FFF8F8}
+.wf-row.wf-indirect{border-color:#FFC107;background:#FFFDF0}
+.wf-row.wf-none{opacity:.5}
+.wf-hdr{width:100%;display:flex;align-items:center;gap:10px;padding:12px 16px;background:none;border:none;text-align:left;cursor:pointer}
+.wf-name{font-size:13px;font-weight:700;color:#1E1B3C;flex:1}
+.wf-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px}
+.wf-badge.direct{background:#FFEBEE;color:#C62828}
+.wf-badge.indirect{background:#FFF8E1;color:#7A5000}
+.wf-chev{font-size:10px;color:#9AA7B4}
+.wf-steps{padding:0 16px 14px;display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.step-row{display:flex;align-items:center;gap:4px}
+.step-arr{color:#C0C8D4;font-size:12px}
+.chip{padding:4px 10px;border-radius:5px;font-size:11px;border:1px solid #E5E5E5;background:#fff;color:#3D3D5C;white-space:nowrap}
+.chip.api{background:#E3F2FD;border-color:#90CAF9;color:#1565C0}
+.chip.domain{background:#F3E5F5;border-color:#CE93D8;color:#6A1B9A}
+.chip.kafka{background:#FFF8E1;border-color:#FFC107;color:#7A5000}
+.chip.background{background:#FFF3E0;border-color:#FF9800;color:#BF360C}
+.chip.external{background:#E8F5E9;border-color:#66BB6A;color:#1B5E20}
+.chip.violation{background:#FFEBEE;border-color:#EF5350;color:#B71C1C;font-weight:700;border-width:2px}
+
+/* REFACTOR GRID (all domains DDD view) */
+.refactor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.rc{background:#fff;border:1.5px solid #E5E5E5;border-radius:10px;overflow:hidden;transition:border-color .2s;cursor:pointer}
+.rc:hover{border-color:#D0DCF0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.rc.selected{border-color:#F15A24;box-shadow:0 0 0 3px rgba(241,90,36,.12)}
+.rc-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #F0F0F0}
+.rc-icon{font-size:18px}
+.rc-name{font-size:13px;font-weight:700;flex:1}
+.rc-agg{font-size:10px;font-family:monospace;color:#9AA7B4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-body{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.rc-pills{display:flex;flex-wrap:wrap;gap:4px}
+.rc-inv{font-size:11px;color:#5B6F8A;padding-left:12px;position:relative;line-height:1.6}
+.rc-inv::before{content:'·';position:absolute;left:0;color:#C0C8D4}
+
+/* INTEGRATIONS */
+.int-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.int-card{background:#fff;border:1.5px solid #E5E5E5;border-radius:10px;padding:14px}
+.int-card.ki{border-color:#FFE082;background:#FFFDE7}
+.int-card.ko{border-color:#FFC107;background:#FFF8E1}
+.int-card.htt{border-color:#90CAF9;background:#E3F2FD}
+.int-card.bg2{border-color:#FF9800;background:#FFF3E0}
+.int-card h4{font-size:11px;font-weight:700;color:#5B6F8A;margin-bottom:10px}
+.int-card ul{list-style:none}
+.int-card ul li{font-size:11px;color:#3D3D5C;padding:2px 0 2px 10px;position:relative;line-height:1.6}
+.int-card ul li::before{content:'·';position:absolute;left:0;color:#C0C8D4}
+
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;color:#5B6F8A}
+.spinner{width:32px;height:32px;border:3px solid #E5E5E5;border-top-color:#F15A24;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{color:#9AA7B4;font-size:13px;padding:20px 0;text-align:center}
+@media(max-width:900px){.int-grid{grid-template-columns:repeat(2,1fr)}.sidebar{display:none}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const {useState,useEffect,createElement:h}=React;
+const API=window.location.origin;
+const HEALTH_LABEL={'good':'✅ Rich','partial':'🟡 Partial','anemic':'🔴 Anemic'};
+const HEALTH_CLS={'good':'health-good','partial':'health-partial','anemic':'health-anemic'};
+const CHIP_CLS={api:'api',domain:'domain',kafka:'kafka',background:'background',external:'external',violation:'violation'};
+
+// ── IMPACT BAR ────────────────────────────────────────
+function ImpactBar({onSearch,counts}){
+  const[v,setV]=useState('');
+  const submit=e=>{e.preventDefault();onSearch(v)};
+  return h('div',{className:'impact-bar'},
+    h('form',{className:'impact-form',onSubmit:submit},
+      h('span',null,'⚡'),
+      h('input',{className:'impact-input',placeholder:"Type a requirement to see critical path… e.g. 'AI metadata tagging'",value:v,onChange:e=>setV(e.target.value)}),
+      h('button',{className:'impact-btn',type:'submit'},'Analyse Impact'),
+      counts&&h('button',{className:'impact-clear',type:'button',onClick:()=>{setV('');onSearch('')}},'✕ Clear')
+    ),
+    counts&&h('div',{className:'impact-summary'},
+      h('span',{className:'badge direct'},`🔴 ${counts.direct} directly impacted`),
+      h('span',{className:'badge indirect'},`🟡 ${counts.indirect} indirectly affected`),
+      h('span',{className:'badge none-b'},`⚪ ${counts.none} unchanged`)
+    )
+  );
+}
+
+// ── DOMAIN DETAIL (current) ───────────────────────────
+function DomainDetailCurrent({domain,impact,onClose}){
+  const score=impact?.domainScores[domain.id];
+  return h('div',null,
+    h('div',{className:'ddd-label',style:{marginBottom:8}},'Operations'),
+    h('div',{className:'ops-grid'},
+      domain.operations.map(op=>h('span',{key:op,className:`op-chip${score?.matchedOps?.includes(op)?' hit':''}`},op))
+    )
+  );
+}
+
+// ── DOMAIN DETAIL (DDD target) ────────────────────────
+function DomainDetailTarget({domain}){
+  const t=domain.dddTarget;
+  if(!t||!t.aggregate) return h('div',{className:'empty'},'No DDD target defined for this domain.');
+  return h('div',{className:'ddd-card'},
+    h('div',{className:'ddd-card-hdr'},
+      h('span',null,t.aggregate),
+      h('span',null,`id: ${t.identity}`)
+    ),
+    h('div',{className:'ddd-body'},
+      t.lifecycle&&t.lifecycle.length>1&&h('div',{className:'ddd-section'},
+        h('div',{className:'ddd-label'},'Lifecycle'),
+        h('div',{className:'lifecycle'},
+          t.lifecycle.map((s,i)=>[
+            h('span',{key:s,className:'ls'},s),
+            i<t.lifecycle.length-1&&h('span',{key:s+'-arr',className:'ls-arr'},'→')
+          ]).flat().filter(Boolean)
+        )
+      ),
+      t.valueObjects&&t.valueObjects.length>0&&h('div',{className:'ddd-section'},
+        h('div',{className:'ddd-label'},'Value Objects'),
+        h('div',{className:'vo-pills'},
+          t.valueObjects.map(vo=>h('span',{key:vo,className:'vo-pill'},vo))
+        )
+      ),
+      t.invariants&&t.invariants.length>0&&h('div',{className:'ddd-section'},
+        h('div',{className:'ddd-label'},'Invariants'),
+        h('ul',{className:'inv-list'},
+          t.invariants.map((inv,i)=>h('li',{key:i},inv))
+        )
+      ),
+      t.commands&&t.commands.length>0&&h('div',{className:'ddd-section'},
+        h('div',{className:'ddd-label'},'Commands → Domain Events'),
+        h('table',{className:'cmd-table'},
+          h('tbody',null,
+            t.commands.map((c,i)=>h('tr',{key:i},
+              h('td',null,c.cmd),
+              h('td',null,'→'),
+              h('td',null,c.event)
+            ))
+          )
+        )
+      )
+    )
+  );
+}
+
+// ── DOMAIN DETAIL PANEL ───────────────────────────────
+function DomainDetail({domain,impact,onClose}){
+  const[tab,setTab]=useState('current');
+  return h('div',{className:'detail-panel'},
+    h('div',{className:'dp-header'},
+      h('span',{className:'dp-icon'},domain.icon),
+      h('span',{className:'dp-title'},domain.name),
+      h('button',{className:'dp-close',onClick:onClose},'✕')
+    ),
+    h('div',{className:'dp-tabs'},
+      h('button',{className:`dp-tab${tab==='current'?' active':''}`,onClick:()=>setTab('current')},'Current State'),
+      h('button',{className:`dp-tab refactor${tab==='ddd'?' active':''}`,onClick:()=>setTab('ddd')},'🔧 DDD Target')
+    ),
+    tab==='current'
+      ?h(DomainDetailCurrent,{domain,impact,onClose})
+      :h(DomainDetailTarget,{domain})
+  );
+}
+
+// ── DOMAIN GRID (current view) ────────────────────────
+function DomainGrid({domains,impact,selected,onSelect}){
+  return h('div',{className:'domain-grid'},
+    domains.map(d=>{
+      const lvl=impact?.domainScores[d.id]?.level??'none';
+      const cls=['dc',impact?`d-${lvl}`:'',selected===d.id?'selected':''].filter(Boolean).join(' ');
+      return h('div',{key:d.id,className:cls,onClick:()=>onSelect(d.id===selected?null:d.id)},
+        h('div',{className:'dc-hdr'},
+          h('span',{className:'dc-icon'},d.icon),
+          h('span',{className:'dc-name'},d.name),
+          impact&&lvl!=='none'&&h('span',{className:`dc-ibadge ${lvl}`},lvl==='direct'?'🔴':'🟡')
+        ),
+        h('div',{className:'dc-health'},HEALTH_LABEL[d.health]),
+        h('ul',{className:'dc-ops'},
+          d.operations.slice(0,3).map(op=>h('li',{key:op,className:impact?.domainScores[d.id]?.matchedOps?.includes(op)?'op-hit':''},op)),
+          d.operations.length>3&&h('li',{key:'more',className:'op-more'},`+${d.operations.length-3} more`)
+        )
+      );
+    })
+  );
+}
+
+// ── REFACTOR GRID (DDD target view) ──────────────────
+function RefactorGrid({domains,selected,onSelect,filterDomainId}){
+  const list=filterDomainId?domains.filter(d=>d.id===filterDomainId):domains;
+  return h('div',{className:'refactor-grid'},
+    list.map(d=>{
+      const t=d.dddTarget||{};
+      const cls=['rc',selected===d.id?'selected':''].filter(Boolean).join(' ');
+      return h('div',{key:d.id,className:cls,onClick:()=>onSelect(d.id===selected?null:d.id)},
+        h('div',{className:'rc-hdr'},
+          h('span',{className:'rc-icon'},d.icon),
+          h('span',{className:'rc-name'},d.name),
+          h('span',{className:`sb-health ${HEALTH_CLS[d.health]}`},HEALTH_LABEL[d.health]),
+        ),
+        h('div',{className:'rc-body'},
+          t.aggregate&&h('div',{style:{fontSize:11,color:'#9AA7B4',fontFamily:'monospace',marginBottom:4}},t.aggregate),
+          t.valueObjects&&t.valueObjects.length>0&&h('div',{className:'rc-pills'},
+            t.valueObjects.map(v=>h('span',{key:v,className:'vo-pill'},v))
+          ),
+          t.invariants&&h('div',null,
+            t.invariants.slice(0,2).map((inv,i)=>h('div',{key:i,className:'rc-inv'},inv))
+          ),
+          t.commands&&h('div',{style:{fontSize:11,color:'#9AA7B4',marginTop:4}},
+            `${t.commands.length} command${t.commands.length!==1?'s':''} → ${t.commands.length} event${t.commands.length!==1?'s':''}`
+          )
+        )
+      );
+    })
+  );
+}
+
+// ── WORKFLOW PANEL ────────────────────────────────────
+function WorkflowPanel({workflows,impact,selected,onSelect,filterDomainId}){
+  const list=filterDomainId?workflows.filter(w=>w.domains.includes(filterDomainId)):workflows;
+  if(!list.length)return h('div',{className:'empty'},'No workflows for this domain.');
+  return h('div',{className:'wf-panel'},
+    list.map(wf=>{
+      const lvl=impact?.workflowScores[wf.id]??'none';
+      const open=selected===wf.id;
+      return h('div',{key:wf.id,className:['wf-row',impact?`wf-${lvl}`:''].filter(Boolean).join(' ')},
+        h('button',{className:'wf-hdr',onClick:()=>onSelect(open?null:wf.id)},
+          h('span',{className:'wf-name'},wf.name),
+          impact&&lvl!=='none'&&h('span',{className:`wf-badge ${lvl}`},lvl==='direct'?'🔴 IMPACTED':'🟡 AFFECTED'),
+          h('span',{className:'wf-chev'},open?'▲':'▼')
+        ),
+        open&&h('div',{className:'wf-steps'},
+          wf.steps.map((s,i)=>h('div',{key:i,className:'step-row'},
+            i>0&&h('span',{className:'step-arr'},'→'),
+            h('span',{className:`chip ${CHIP_CLS[s.type]??''}`},s.label)
+          ))
+        )
+      );
+    })
+  );
+}
+
+// ── SIDEBAR ───────────────────────────────────────────
+function Sidebar({domains,selected,onSelect,impact}){
+  return h('aside',{className:'sidebar'},
+    h('div',{className:'sb-title'},'Domains'),
+    h('div',{className:'sb-item',style:{color:selected?'#9AA7B4':'#1E1B3C',fontWeight:selected?400:600},onClick:()=>onSelect(null)},
+      h('span',{className:'sb-icon'},'🗂'),
+      h('span',null,'All domains')
+    ),
+    domains.map(d=>{
+      const lvl=impact?.domainScores[d.id]?.level??'none';
+      const cls=['sb-item',selected===d.id?'selected':'',impact&&lvl!=='none'?`impact-${lvl}`:''].filter(Boolean).join(' ');
+      return h('div',{key:d.id,className:cls,onClick:()=>onSelect(d.id===selected?null:d.id)},
+        h('span',{className:'sb-icon'},d.icon),
+        h('span',null,d.name),
+        h('span',{className:`sb-health ${HEALTH_CLS[d.health]}`},d.health==='good'?'✅':d.health==='partial'?'🟡':'🔴')
+      );
+    })
+  );
+}
+
+// ── APP ───────────────────────────────────────────────
+function App(){
+  const[data,setData]=useState(null);
+  const[impact,setImpact]=useState(null);
+  const[selDomain,setSelDomain]=useState(null);
+  const[selWf,setSelWf]=useState(null);
+  const[view,setView]=useState('current'); // 'current' | 'refactor'
+  const[loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    fetch(`${API}/api/analyze/content-manager-service`)
+      .then(r=>r.json()).then(d=>{setData(d);setLoading(false);})
+      .catch(()=>setLoading(false));
+  },[]);
+
+  const handleImpact=async req=>{
+    if(!req.trim()){setImpact(null);return;}
+    const r=await fetch(`${API}/api/impact`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:'content-manager-service',requirement:req})});
+    setImpact(await r.json());
+  };
+
+  if(loading)return h('div',{className:'loading'},h('div',{className:'spinner'}),h('p',null,'Analysing service…'));
+  if(!data)return h('div',{className:'loading'},h('p',null,'Run: node backend/server.js'));
+
+  const counts=impact?{
+    direct:data.domains.filter(d=>impact.domainScores[d.id]?.level==='direct').length,
+    indirect:data.domains.filter(d=>impact.domainScores[d.id]?.level==='indirect').length,
+    none:data.domains.filter(d=>(impact.domainScores[d.id]?.level??'none')==='none').length
+  }:null;
+
+  const selectedDomain=selDomain?data.domains.find(d=>d.id===selDomain):null;
+
+  return h('div',null,
+    // Header
+    h('header',{className:'hdr'},
+      h('div',{className:'hdr-l'},
+        h('div',{className:'logo-s'},'S'),
+        h('span',{className:'logo-txt'},'DomainCompose Studio'),
+        h('span',{className:'svc-badge'},data.service)
+      ),
+      h('div',{className:'view-toggle'},
+        h('button',{className:`vt-btn${view==='current'?' active':''}`,onClick:()=>setView('current')},'📄 Domain Map'),
+        h('button',{className:`vt-btn refactor${view==='refactor'?' active':''}`,onClick:()=>setView('refactor')},'🔧 Refactor Target')
+      ),
+      h('div',{className:'hdr-r'},`Analysed ${data.analyzedAt}`)
+    ),
+
+    // Impact bar
+    h(ImpactBar,{onSearch:handleImpact,counts}),
+
+    // Main layout
+    h('div',{className:'layout'},
+      h(Sidebar,{domains:data.domains,selected:selDomain,onSelect:id=>{setSelDomain(id);setSelWf(null);},impact}),
+
+      h('main',{className:'content'},
+        // Domain detail panel when a domain is selected
+        selectedDomain&&h(DomainDetail,{domain:selectedDomain,impact,onClose:()=>setSelDomain(null)}),
+
+        // Current view
+        view==='current'&&h('div',null,
+          h('div',{className:'sec-title'},selDomain?`${selectedDomain?.name} — Domains`:'All Domains'),
+          h(DomainGrid,{domains:selDomain?data.domains.filter(d=>d.id===selDomain):data.domains,impact,selected:selDomain,onSelect:setSelDomain}),
+          h('div',{className:'sec-title',style:{marginTop:28}},selDomain?`${selectedDomain?.name} — Workflows`:'Key Workflows'),
+          h(WorkflowPanel,{workflows:data.workflows,impact,selected:selWf,onSelect:setSelWf,filterDomainId:selDomain}),
+          !selDomain&&h('div',null,
+            h('div',{className:'sec-title',style:{marginTop:28}},'External Integrations'),
+            h('div',{className:'int-grid'},
+              [{t:'Kafka — IN',items:data.integrations.kafkaIn,c:'ki'},{t:'Kafka — OUT',items:data.integrations.kafkaOut,c:'ko'},{t:'HTTP Services',items:data.integrations.http,c:'htt'},{t:'Background',items:data.integrations.background,c:'bg2'}]
+              .map(g=>h('div',{key:g.t,className:`int-card ${g.c}`},h('h4',null,g.t),h('ul',null,g.items.map(i=>h('li',{key:i},i)))))
+            )
+          )
+        ),
+
+        // Refactor view
+        view==='refactor'&&h('div',null,
+          h('div',{className:'sec-title'},selDomain?`${selectedDomain?.name} — DDD Target`:'DDD Target Design — All Domains'),
+          h(RefactorGrid,{domains:data.domains,selected:selDomain,onSelect:setSelDomain,filterDomainId:selDomain})
+        )
+      )
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
