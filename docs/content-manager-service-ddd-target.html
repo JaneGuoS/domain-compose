@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Manager Service — DDD Target Design</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #1a1a2e; }
+
+  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; padding: 28px 36px; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .header .subtitle { font-size: 13px; color: #8892b0; margin-top: 4px; }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 28px 24px; }
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #8892b0; margin-bottom: 14px; }
+  .section-gap { margin-bottom: 36px; }
+
+  /* Bounded context */
+  .bc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .bc-card { background: #fff; border-radius: 8px; border: 1.5px solid #e8ecf0; padding: 14px 16px; }
+  .bc-card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8892b0; margin-bottom: 8px; }
+  .bc-item { font-size: 12px; color: #3d4a5c; padding: 2px 0; }
+
+  /* Aggregate cards */
+  .aggregates-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .agg-card { background: #fff; border-radius: 10px; border: 1.5px solid #e8ecf0; padding: 20px; }
+  .agg-card.blue { border-top: 3px solid #1565c0; }
+  .agg-card.red { border-top: 3px solid #c62828; }
+  .agg-card.green { border-top: 3px solid #2e7d32; }
+  .agg-card.purple { border-top: 3px solid #6a1b9a; }
+  .agg-card.teal { border-top: 3px solid #00695c; }
+  .agg-card.amber { border-top: 3px solid #e65100; }
+
+  .agg-name { font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+  .agg-identity { font-size: 11.5px; color: #8892b0; margin-bottom: 12px; }
+
+  .agg-section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #b0bec5; margin-top: 12px; margin-bottom: 5px; }
+
+  .lifecycle { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .lc-state { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #f0f2f5; color: #3d4a5c; }
+  .lc-arrow { color: #b0bec5; font-size: 12px; }
+
+  .vo-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .vo-pill { padding: 2px 9px; border-radius: 10px; font-size: 11px; background: #f0f4ff; color: #3b5bdb; border: 1px solid #c5d0ff; }
+
+  .invariants { list-style: none; }
+  .invariants li { font-size: 11.5px; color: #5a6474; padding: 3px 0; display: flex; gap: 6px; }
+  .invariants li::before { content: '⚑'; color: #ffa502; font-size: 10px; flex-shrink: 0; margin-top: 2px; }
+
+  .commands-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .commands-table th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #b0bec5; text-align: left; padding: 4px 6px; border-bottom: 1px solid #f0f2f5; }
+  .commands-table td { font-size: 11.5px; color: #3d4a5c; padding: 4px 6px; border-bottom: 1px solid #f0f2f5; }
+  .commands-table tr:last-child td { border-bottom: none; }
+  .cmd-code { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11px; color: #c62828; }
+  .event-pill { display: inline-block; padding: 1px 7px; border-radius: 8px; background: #fff3e0; color: #e65100; font-size: 10.5px; font-weight: 600; }
+
+  /* Gap analysis */
+  .gap-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1.5px solid #e8ecf0; }
+  .gap-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #8892b0; padding: 10px 14px; text-align: left; border-bottom: 2px solid #f0f2f5; background: #fafbfc; }
+  .gap-table td { font-size: 12px; color: #3d4a5c; padding: 10px 14px; border-bottom: 1px solid #f0f2f5; vertical-align: top; }
+  .gap-table tr:last-child td { border-bottom: none; }
+  .sev-p0 { display: inline-block; padding: 2px 8px; border-radius: 8px; background: #ff4757; color: #fff; font-size: 10px; font-weight: 700; }
+  .sev-p1 { display: inline-block; padding: 2px 8px; border-radius: 8px; background: #ffa502; color: #fff; font-size: 10px; font-weight: 700; }
+  .sev-p2 { display: inline-block; padding: 2px 8px; border-radius: 8px; background: #2ed573; color: #1a1a2e; font-size: 10px; font-weight: 700; }
+  .cat-pill { display: inline-block; padding: 2px 8px; border-radius: 8px; background: #f0f2f5; color: #5a6474; font-size: 10px; font-weight: 600; }
+
+  /* Before/after */
+  .ba-block { background: #fff; border-radius: 10px; border: 1.5px solid #e8ecf0; padding: 20px; margin-bottom: 14px; }
+  .ba-title { font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 3px; display: flex; align-items: center; gap: 8px; }
+  .ba-files { font-size: 11.5px; color: #8892b0; margin-bottom: 14px; }
+  .ba-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ba-col-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .ba-col-label.before { color: #ff4757; }
+  .ba-col-label.after { color: #2ed573; }
+  pre { background: #1a1a2e; color: #a8dadc; border-radius: 8px; padding: 14px; font-size: 11.5px; font-family: 'SFMono-Regular', Consolas, monospace; overflow-x: auto; line-height: 1.6; }
+  .before pre { border-left: 3px solid #ff4757; }
+  .after pre { border-left: 3px solid #2ed573; }
+
+  /* Event routing */
+  .event-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1.5px solid #e8ecf0; }
+  .event-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #8892b0; padding: 10px 14px; text-align: left; border-bottom: 2px solid #f0f2f5; background: #fafbfc; }
+  .event-table td { font-size: 12px; color: #3d4a5c; padding: 10px 14px; border-bottom: 1px solid #f0f2f5; }
+  .event-table tr:last-child td { border-bottom: none; }
+
+  /* Architecture diagram SVG container */
+  .arch-diagram { background: #fff; border-radius: 10px; border: 1.5px solid #e8ecf0; padding: 24px; }
+  .arch-diagram svg { width: 100%; height: auto; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Content Manager Service — DDD Target Design</h1>
+  <div class="subtitle">Generated 2026-06-08 · Depth 2 · Input to /seismic-engineering:plan</div>
+</div>
+
+<div class="container">
+
+  <!-- BOUNDED CONTEXT -->
+  <div class="section-gap">
+    <div class="section-title">Bounded Context</div>
+    <div class="bc-grid">
+      <div class="bc-card">
+        <div class="bc-card-title">Owns</div>
+        <div class="bc-item">Content items (files, folders)</div>
+        <div class="bc-item">Item versions &amp; lifecycle states</div>
+        <div class="bc-item">Publishing workflow</div>
+        <div class="bc-item">Content permissions</div>
+        <div class="bc-item">Comments &amp; annotations</div>
+        <div class="bc-item">Custom property values</div>
+        <div class="bc-item">External sync tasks</div>
+      </div>
+      <div class="bc-card">
+        <div class="bc-card-title">Depends On</div>
+        <div class="bc-item">UMS — user identity &amp; auth</div>
+        <div class="bc-item">COS — binary blob storage</div>
+        <div class="bc-item">Profile Service — user profiles</div>
+        <div class="bc-item">Google Drive / OneDrive APIs</div>
+        <div class="bc-item">Notification Client</div>
+        <div class="bc-item">Tiled (MicroApp embedding)</div>
+      </div>
+      <div class="bc-card">
+        <div class="bc-card-title">Publishes</div>
+        <div class="bc-item">content-manager-service.content-event</div>
+        <div class="bc-item">content-manager.webhook-event</div>
+        <div class="bc-item">eventbus.public.search.ingest</div>
+      </div>
+      <div class="bc-card">
+        <div class="bc-card-title">Consumes</div>
+        <div class="bc-item">eventbus.public.ccp.meta</div>
+        <div class="bc-item">eventbus.scp.vfs.processed</div>
+        <div class="bc-item">eventbus.public.cms.custom-property</div>
+        <div class="bc-item">eventbus.public.blob-virus-scan.audit-trail</div>
+        <div class="bc-item">expiration-notification-setting (private)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGGREGATE ROOTS -->
+  <div class="section-gap">
+    <div class="section-title">Aggregate Roots</div>
+    <div class="aggregates-grid">
+
+      <!-- ItemEntity -->
+      <div class="agg-card blue">
+        <div class="agg-name">ItemEntity  <span style="font-size:12px;font-weight:400;color:#8892b0;">(aggregate root)</span></div>
+        <div class="agg-identity">Identity: Id (Guid) · TeamSiteId · TypeId</div>
+
+        <div class="agg-section-label">Lifecycle</div>
+        <div class="lifecycle">
+          <span class="lc-state">Draft</span><span class="lc-arrow">→</span>
+          <span class="lc-state">Active</span><span class="lc-arrow">→</span>
+          <span class="lc-state">Published</span><span class="lc-arrow">→</span>
+          <span class="lc-state">Expired</span>
+          <span class="lc-arrow">|</span>
+          <span class="lc-state">Quarantined</span>
+        </div>
+
+        <div class="agg-section-label">Value Objects</div>
+        <div class="vo-pills">
+          <span class="vo-pill">ItemStatus</span>
+          <span class="vo-pill">ContentOrigin</span>
+          <span class="vo-pill">ExpirationPolicy</span>
+          <span class="vo-pill">CheckoutState</span>
+        </div>
+
+        <div class="agg-section-label">Child Entities</div>
+        <div class="vo-pills">
+          <span class="vo-pill" style="background:#f0fff4;border-color:#b2dfdb;color:#2e7d32;">ItemVersionEntity</span>
+          <span class="vo-pill" style="background:#f0fff4;border-color:#b2dfdb;color:#2e7d32;">CommentEntity</span>
+          <span class="vo-pill" style="background:#f0fff4;border-color:#b2dfdb;color:#2e7d32;">CustomPropertyValue</span>
+        </div>
+
+        <div class="agg-section-label">Invariants</div>
+        <ul class="invariants">
+          <li>An item cannot be published if it has never been in Active state</li>
+          <li>An item cannot be checked out while already checked out by another user</li>
+          <li>A quarantined item cannot transition to Published</li>
+          <li>An expired item cannot be checked out</li>
+          <li>Custom property values must conform to their defined type schema</li>
+        </ul>
+
+        <div class="agg-section-label">Commands → Domain Events</div>
+        <table class="commands-table">
+          <tr><th>Command</th><th>Event Raised</th></tr>
+          <tr><td class="cmd-code">Create(actorId, teamSiteId, request)</td><td><span class="event-pill">ItemCreated</span></td></tr>
+          <tr><td class="cmd-code">Activate(actorId)</td><td><span class="event-pill">ItemActivated</span></td></tr>
+          <tr><td class="cmd-code">Publish(actorId)</td><td><span class="event-pill">ItemPublished</span></td></tr>
+          <tr><td class="cmd-code">Expire()</td><td><span class="event-pill">ItemExpired</span></td></tr>
+          <tr><td class="cmd-code">Quarantine(scanResult)</td><td><span class="event-pill">ItemQuarantined</span></td></tr>
+          <tr><td class="cmd-code">CheckOut(actorId)</td><td><span class="event-pill">ItemCheckedOut</span></td></tr>
+          <tr><td class="cmd-code">CheckIn(actorId)</td><td><span class="event-pill">ItemCheckedIn</span></td></tr>
+          <tr><td class="cmd-code">SetCustomProperty(key, value)</td><td><span class="event-pill">ItemPropertySet</span></td></tr>
+        </table>
+      </div>
+
+      <!-- FolderEntity -->
+      <div class="agg-card red">
+        <div class="agg-name">FolderEntity  <span style="font-size:12px;font-weight:400;color:#8892b0;">(aggregate root)</span></div>
+        <div class="agg-identity">Identity: Id (Guid) · TeamSiteId · ParentId (nullable)</div>
+
+        <div class="agg-section-label">Lifecycle</div>
+        <div class="lifecycle">
+          <span class="lc-state">Active</span><span class="lc-arrow">→</span>
+          <span class="lc-state">Archived</span>
+        </div>
+
+        <div class="agg-section-label">Value Objects</div>
+        <div class="vo-pills">
+          <span class="vo-pill">FolderPath</span>
+          <span class="vo-pill">FolderDepth</span>
+          <span class="vo-pill">PermissionInheritance</span>
+        </div>
+
+        <div class="agg-section-label">Invariants</div>
+        <ul class="invariants">
+          <li>A folder cannot be moved into one of its own descendants (cycle prevention)</li>
+          <li>A folder cannot be deleted while it contains active items</li>
+          <li>Root folders cannot have a parent assigned</li>
+        </ul>
+
+        <div class="agg-section-label">Commands → Domain Events</div>
+        <table class="commands-table">
+          <tr><th>Command</th><th>Event Raised</th></tr>
+          <tr><td class="cmd-code">Create(actorId, teamSiteId, name, parentId)</td><td><span class="event-pill">FolderCreated</span></td></tr>
+          <tr><td class="cmd-code">Rename(actorId, newName)</td><td><span class="event-pill">FolderRenamed</span></td></tr>
+          <tr><td class="cmd-code">Move(actorId, newParentId)</td><td><span class="event-pill">FolderMoved</span></td></tr>
+          <tr><td class="cmd-code">Archive(actorId)</td><td><span class="event-pill">FolderArchived</span></td></tr>
+          <tr><td class="cmd-code">Delete(actorId)</td><td><span class="event-pill">FolderDeleted</span></td></tr>
+        </table>
+      </div>
+
+      <!-- PublishJobEntity -->
+      <div class="agg-card amber">
+        <div class="agg-name">PublishJobEntity  <span style="font-size:12px;font-weight:400;color:#8892b0;">(aggregate root)</span></div>
+        <div class="agg-identity">Identity: Id (Guid) · ItemId · TenantId</div>
+
+        <div class="agg-section-label">Lifecycle</div>
+        <div class="lifecycle">
+          <span class="lc-state">Scheduled</span><span class="lc-arrow">→</span>
+          <span class="lc-state">Executing</span><span class="lc-arrow">→</span>
+          <span class="lc-state">Completed</span>
+          <span class="lc-arrow">|</span>
+          <span class="lc-state">Failed</span>
+          <span class="lc-arrow">|</span>
+          <span class="lc-state">Cancelled</span>
+        </div>
+
+        <div class="agg-section-label">Value Objects</div>
+        <div class="vo-pills">
+          <span class="vo-pill">ScheduledAt</span>
+          <span class="vo-pill">PublishMode</span>
+          <span class="vo-pill">JobStatus</span>
+        </div>
+
+        <div class="agg-section-label">Invariants</div>
+        <ul class="invariants">
+          <li>A publish job cannot be scheduled for a date in the past</li>
+          <li>A completed or failed job cannot be rescheduled</li>
+          <li>At most one active publish job may exist per item</li>
+        </ul>
+
+        <div class="agg-section-label">Commands → Domain Events</div>
+        <table class="commands-table">
+          <tr><th>Command</th><th>Event Raised</th></tr>
+          <tr><td class="cmd-code">Schedule(actorId, itemId, scheduledAt)</td><td><span class="event-pill">PublishJobScheduled</span></td></tr>
+          <tr><td class="cmd-code">Execute()</td><td><span class="event-pill">PublishJobExecuted</span></td></tr>
+          <tr><td class="cmd-code">Cancel(actorId)</td><td><span class="event-pill">PublishJobCancelled</span></td></tr>
+          <tr><td class="cmd-code">MarkFailed(reason)</td><td><span class="event-pill">PublishJobFailed</span></td></tr>
+        </table>
+      </div>
+
+      <!-- ExternalSyncTaskEntity -->
+      <div class="agg-card green">
+        <div class="agg-name">ExternalSyncTaskEntity  <span style="font-size:12px;font-weight:400;color:#8892b0;">(aggregate root)</span></div>
+        <div class="agg-identity">Identity: Id (Guid) · Provider · TenantId</div>
+
+        <div class="agg-section-label">Lifecycle</div>
+        <div class="lifecycle">
+          <span class="lc-state">Pending</span><span class="lc-arrow">→</span>
+          <span class="lc-state">Running</span><span class="lc-arrow">→</span>
+          <span class="lc-state">Completed</span>
+          <span class="lc-arrow">|</span>
+          <span class="lc-state">Failed</span>
+        </div>
+
+        <div class="agg-section-label">Value Objects</div>
+        <div class="vo-pills">
+          <span class="vo-pill">SyncProvider</span>
+          <span class="vo-pill">SyncCredential</span>
+          <span class="vo-pill">SyncIndicator</span>
+        </div>
+
+        <div class="agg-section-label">Invariants</div>
+        <ul class="invariants">
+          <li>A sync task cannot start without valid credentials</li>
+          <li>Only one sync task per provider per tenant may be Running at a time</li>
+          <li>A failed task must record a non-empty failure reason</li>
+        </ul>
+
+        <div class="agg-section-label">Commands → Domain Events</div>
+        <table class="commands-table">
+          <tr><th>Command</th><th>Event Raised</th></tr>
+          <tr><td class="cmd-code">Initiate(actorId, provider, credential)</td><td><span class="event-pill">SyncTaskInitiated</span></td></tr>
+          <tr><td class="cmd-code">Start()</td><td><span class="event-pill">SyncTaskStarted</span></td></tr>
+          <tr><td class="cmd-code">Complete(itemsProcessed)</td><td><span class="event-pill">SyncTaskCompleted</span></td></tr>
+          <tr><td class="cmd-code">Fail(reason)</td><td><span class="event-pill">SyncTaskFailed</span></td></tr>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DOMAIN SERVICES -->
+  <div class="section-gap">
+    <div class="section-title">Domain Services</div>
+    <div style="background:#fff;border-radius:10px;border:1.5px solid #e8ecf0;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#fafbfc;">
+            <th style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#8892b0;padding:10px 14px;text-align:left;border-bottom:2px solid #f0f2f5;">Service</th>
+            <th style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#8892b0;padding:10px 14px;text-align:left;border-bottom:2px solid #f0f2f5;">Coordinates</th>
+            <th style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#8892b0;padding:10px 14px;text-align:left;border-bottom:2px solid #f0f2f5;">Cross-aggregate rule it enforces</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:12px;font-family:monospace;color:#c62828;">ContentPermissionService</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#3d4a5c;">ItemEntity · FolderEntity · UMS</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#3d4a5c;">Permission checks span both item and its containing folder — neither aggregate alone can evaluate inherited permissions</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:12px;font-family:monospace;color:#c62828;">PublishEligibilityService</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#3d4a5c;">ItemEntity · PublishJobEntity</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#3d4a5c;">An item can only be published if it is Active AND no conflicting publish job is already scheduled — cross-aggregate invariant</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:12px;font-family:monospace;color:#c62828;">ContentSearchSyncService</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#3d4a5c;">ItemEntity · SearchProducer</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#3d4a5c;">After any item state change that affects discoverability, a search.ingest event must be published — decoupled from aggregate</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-size:12px;font-family:monospace;color:#c62828;">ExternalSyncDomainService</td>
+            <td style="padding:10px 14px;font-size:12px;color:#3d4a5c;">ExternalSyncTaskEntity · ItemEntity</td>
+            <td style="padding:10px 14px;font-size:12px;color:#3d4a5c;">Items created by sync tasks must be associated with their source provider — ExternalSyncTask owns the task, ItemEntity owns the resulting content</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DOMAIN EVENT ROUTING -->
+  <div class="section-gap">
+    <div class="section-title">Domain Event Routing</div>
+    <table class="event-table">
+      <thead>
+        <tr>
+          <th>Domain Event</th>
+          <th>Trigger</th>
+          <th>Internal Queue</th>
+          <th>Kafka Topic</th>
+          <th>Downstream</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="event-pill">ItemCreated</span></td>
+          <td>ItemEntity.Create()</td>
+          <td>ContentNotificationQueue</td>
+          <td>content-manager-service.content-event</td>
+          <td>Search ingestion · Webhooks</td>
+        </tr>
+        <tr>
+          <td><span class="event-pill">ItemPublished</span></td>
+          <td>ItemEntity.Publish()</td>
+          <td>ContentNotificationQueue</td>
+          <td>content-manager-service.content-event · search.ingest</td>
+          <td>Search · Analytics · Webhooks · Notifications</td>
+        </tr>
+        <tr>
+          <td><span class="event-pill">ItemExpired</span></td>
+          <td>ItemEntity.Expire()</td>
+          <td>—</td>
+          <td>content-manager-service.content-event</td>
+          <td>Notification Client (owner alert)</td>
+        </tr>
+        <tr>
+          <td><span class="event-pill">ItemQuarantined</span></td>
+          <td>ItemEntity.Quarantine()</td>
+          <td>—</td>
+          <td>content-manager-service.content-event</td>
+          <td>Notification Client (security alert) · Search de-index</td>
+        </tr>
+        <tr>
+          <td><span class="event-pill">PublishJobExecuted</span></td>
+          <td>PublishJobEntity.Execute()</td>
+          <td>—</td>
+          <td>content-manager-service.content-event</td>
+          <td>ItemEntity.Publish() (chained)</td>
+        </tr>
+        <tr>
+          <td><span class="event-pill">SyncTaskCompleted</span></td>
+          <td>ExternalSyncTaskEntity.Complete()</td>
+          <td>—</td>
+          <td>content-manager-service.content-event</td>
+          <td>Search ingestion for newly created items</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- GAP ANALYSIS -->
+  <div class="section-gap">
+    <div class="section-title">DDD Gap Analysis</div>
+    <table class="gap-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Violation</th>
+          <th>File(s)</th>
+          <th>Severity</th>
+          <th>Category</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Anemic domain model — ItemModel has no invariant methods.</strong> Status transitions (draft→active→published→expired) are set as raw property assignments in orchestrators and writers rather than enforced aggregate command methods.</td>
+          <td style="font-family:monospace;font-size:11px;">ItemModel.cs · FileWriter.cs · IPublishOrchestrator impls</td>
+          <td><span class="sev-p0">P0</span></td>
+          <td><span class="cat-pill">Anemic model</span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Business logic concentrated in 45+ Orchestrators instead of aggregates.</strong> IPublishOrchestrator, IPermissionOrchestrator, IFileOrchestrator etc. each contain domain rules (state guards, invariant checks) that belong inside aggregate command methods.</td>
+          <td style="font-family:monospace;font-size:11px;">Seismic.ContentManager.Express.Orchestrator/*</td>
+          <td><span class="sev-p0">P0</span></td>
+          <td><span class="cat-pill">Layer violation</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Reader/Writer pattern bypasses domain entirely.</strong> FileWriter.AddFile() and FileWriter.DeleteFile() call repositories directly without loading or mutating a domain entity, making invariants impossible to enforce at the domain layer.</td>
+          <td style="font-family:monospace;font-size:11px;">FileWriter.cs · CommentWriter.cs · FolderWriter.cs</td>
+          <td><span class="sev-p0">P0</span></td>
+          <td><span class="cat-pill">Layer violation</span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Primitive obsession — no value objects for status, origin, or checkout state.</strong> ContentEventTypeEnum and item status are raw strings/enums on the model. Validation and transition rules are duplicated across orchestrators.</td>
+          <td style="font-family:monospace;font-size:11px;">ItemModel.cs · ContentEventTypeEnum.cs · various orchestrators</td>
+          <td><span class="sev-p1">P1</span></td>
+          <td><span class="cat-pill">Missing concept</span></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>Permission logic scattered across all layers.</strong> Permission checks appear in controllers (route guards), orchestrators (IPermissionOrchestrator, IPermissionCheckerOrchestrator), and repositories — no single authoritative permission enforcement point.</td>
+          <td style="font-family:monospace;font-size:11px;">PermissionController.cs · IPermissionOrchestrator.cs · ContentPermissionRepository.cs</td>
+          <td><span class="sev-p1">P1</span></td>
+          <td><span class="cat-pill">Layer violation</span></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><strong>No domain events raised for key state changes.</strong> When an item is published or quarantined, the Kafka event is published directly from orchestrators/writers without first raising an internal domain event — bypassing any domain event handlers.</td>
+          <td style="font-family:monospace;font-size:11px;">SearchProducer.cs · ContentEventConsumer.cs · FileWriter.cs</td>
+          <td><span class="sev-p1">P1</span></td>
+          <td><span class="cat-pill">Missing concept</span></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><strong>Complex query logic duplicated across Readers and Repositories.</strong> ItemReader, FileVersionReader, and ItemRepository each implement overlapping query logic without a shared Specification pattern.</td>
+          <td style="font-family:monospace;font-size:11px;">FileVersionReader.cs · ItemRepository.cs · FolderRepository.cs</td>
+          <td><span class="sev-p2">P2</span></td>
+          <td><span class="cat-pill">Infra coupling</span></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><strong>Exception class hierarchy instead of typed exception enum.</strong> ContentManagerException subclasses (ContentDeleteException, NoPermissionException, etc.) are scattered — no central DomainExceptionType enum mapping to HTTP status codes.</td>
+          <td style="font-family:monospace;font-size:11px;">LibraryService.Core/Exceptions/*.cs</td>
+          <td><span class="sev-p2">P2</span></td>
+          <td><span class="cat-pill">Missing concept</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- BEFORE / AFTER -->
+  <div class="section-gap">
+    <div class="section-title">Before / After — P0 Violations</div>
+
+    <div class="ba-block">
+      <div class="ba-title"><span class="sev-p0">P0</span> Anemic Domain Model — Item Status Transition</div>
+      <div class="ba-files">Move: IPublishOrchestrator impl lines → ItemEntity.Publish() · Add: ItemStatus value object</div>
+      <div class="ba-cols">
+        <div class="before">
+          <div class="ba-col-label before">Current (violation)</div>
+<pre>// PublishOrchestratorImpl.cs — status set externally
+var item = await _itemRepository.GetAsync(itemId);
+if (item.Status != "active")
+    throw new Exception("Item must be active to publish");
+item.Status = "published";          // ← raw assignment
+item.PublishedDate = DateTime.UtcNow;
+await _itemRepository.UpdateAsync(item);
+await _searchProducer.SendAsync(...); // ← Kafka called here</pre>
+        </div>
+        <div class="after">
+          <div class="ba-col-label after">Target (DDD-correct)</div>
+<pre>// ItemEntity.cs — invariant enforced by aggregate
+public void Publish(Guid actorId)
+{
+    if (Status != ItemStatus.Active)
+        throw new ContentManagerException(
+            ContentManagerExceptionType.ItemNotPublishable,
+            "Only active items can be published.");
+    Status = ItemStatus.Published;
+    PublishedAt = DateTime.UtcNow;
+    AddDomainEvent(new ItemPublished(Id, actorId));
+}
+
+// ItemAppService.cs — orchestration only
+var item = await _itemRepository.GetAsync(itemId);
+item.Publish(actorId);              // ← delegates to aggregate
+await _itemRepository.UpdateAsync(item);
+// domain event handler dispatches Kafka publish</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="ba-block">
+      <div class="ba-title"><span class="sev-p0">P0</span> Reader/Writer Bypasses Domain</div>
+      <div class="ba-files">Replace: FileWriter.AddFile() → ItemEntity.Create() + ItemAppService · Remove: FileWriter class</div>
+      <div class="ba-cols">
+        <div class="before">
+          <div class="ba-col-label before">Current (violation)</div>
+<pre>// FileWriter.cs — no domain entity involved
+public async Task&lt;FileModel&gt; AddFile(
+    int teamSiteId, NewFile newFile)
+{
+    // validation inline in writer
+    if (string.IsNullOrEmpty(newFile.Name))
+        throw new ArgumentException("Name required");
+    var model = MapToModel(newFile);
+    model.CreateTime = DateTime.UtcNow;
+    // calls repo directly — no aggregate loaded
+    return await _fileRepository.InsertAsync(model);
+}</pre>
+        </div>
+        <div class="after">
+          <div class="ba-col-label after">Target (DDD-correct)</div>
+<pre>// ItemEntity.cs — factory command
+public static ItemEntity Create(
+    Guid actorId, int teamSiteId, CreateItemRequest req)
+{
+    if (string.IsNullOrEmpty(req.Name))
+        throw new ContentManagerException(
+            ContentManagerExceptionType.ItemNameRequired);
+    var entity = new ItemEntity(teamSiteId, req);
+    entity.AddDomainEvent(new ItemCreated(entity.Id, actorId));
+    return entity;
+}
+
+// ItemAppService.cs
+var item = ItemEntity.Create(actorId, teamSiteId, request);
+await _itemRepository.AddAsync(item);
+// ItemCreated event handler publishes to Kafka + search</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="ba-block">
+      <div class="ba-title"><span class="sev-p0">P0</span> Orchestrator Contains Domain Rules</div>
+      <div class="ba-files">Move: IPublishOrchestrator business guards → ItemEntity / PublishEligibilityService · Keep: orchestrators as thin coordinators</div>
+      <div class="ba-cols">
+        <div class="before">
+          <div class="ba-col-label before">Current (violation)</div>
+<pre>// PublishOrchestratorImpl.cs — domain rule in wrong layer
+public async Task PublishAsync(int itemId, int actorId)
+{
+    var permission = await _permissionOrchestrator
+        .CheckAsync(actorId, itemId, "publish");
+    if (!permission.Allowed) throw ...;
+
+    var existingJob = await _scheduleRepo
+        .GetActiveJobAsync(itemId);     // ← cross-aggregate check
+    if (existingJob != null) throw ...;
+
+    // more business rules ...
+}</pre>
+        </div>
+        <div class="after">
+          <div class="ba-col-label after">Target (DDD-correct)</div>
+<pre>// ItemAppService.cs — thin orchestration
+public async Task PublishAsync(Guid actorId, Guid itemId)
+{
+    // Guard: permission check via domain service
+    await _permissionService.AssertCanPublishAsync(
+        actorId, itemId);
+
+    // Guard: cross-aggregate eligibility via domain service
+    await _publishEligibilityService
+        .AssertEligibleAsync(itemId);
+
+    // Load → mutate via aggregate command
+    var item = await _itemRepository.GetAsync(itemId);
+    item.Publish(actorId);             // ← business rule inside
+    await _itemRepository.UpdateAsync(item);
+    // domain events dispatched by handler
+}</pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ARCHITECTURE DIAGRAM -->
+  <div class="section-gap">
+    <div class="section-title">Target Architecture Diagram</div>
+    <div class="arch-diagram">
+      <svg viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+        <!-- Layer bands -->
+        <rect x="10" y="10" width="880" height="80" rx="8" fill="#e8f4fd" stroke="#bbdefb" stroke-width="1.5"/>
+        <text x="22" y="28" font-size="10" font-weight="700" fill="#1565c0" letter-spacing="1">PRESENTATION</text>
+
+        <rect x="10" y="105" width="880" height="80" rx="8" fill="#fff8e1" stroke="#ffe082" stroke-width="1.5"/>
+        <text x="22" y="123" font-size="10" font-weight="700" fill="#e65100" letter-spacing="1">APPLICATION</text>
+
+        <rect x="10" y="200" width="880" height="120" rx="8" fill="#fce4ec" stroke="#f8bbd0" stroke-width="1.5"/>
+        <text x="22" y="218" font-size="10" font-weight="700" fill="#c62828" letter-spacing="1">DOMAIN</text>
+
+        <rect x="10" y="335" width="880" height="175" rx="8" fill="#e8f5e9" stroke="#c8e6c9" stroke-width="1.5"/>
+        <text x="22" y="353" font-size="10" font-weight="700" fill="#2e7d32" letter-spacing="1">INFRASTRUCTURE</text>
+
+        <!-- Presentation: Controllers -->
+        <rect x="30" y="35" width="120" height="42" rx="6" fill="#fff" stroke="#bbdefb" stroke-width="1.5"/>
+        <text x="90" y="54" font-size="10" font-weight="600" fill="#1565c0" text-anchor="middle">FileController</text>
+        <text x="90" y="68" font-size="9" fill="#8892b0" text-anchor="middle">FolderController</text>
+
+        <rect x="175" y="35" width="130" height="42" rx="6" fill="#fff" stroke="#bbdefb" stroke-width="1.5"/>
+        <text x="240" y="54" font-size="10" font-weight="600" fill="#1565c0" text-anchor="middle">PublishController</text>
+        <text x="240" y="68" font-size="9" fill="#8892b0" text-anchor="middle">SchedulePublishController</text>
+
+        <rect x="330" y="35" width="130" height="42" rx="6" fill="#fff" stroke="#bbdefb" stroke-width="1.5"/>
+        <text x="395" y="54" font-size="10" font-weight="600" fill="#1565c0" text-anchor="middle">PermissionController</text>
+        <text x="395" y="68" font-size="9" fill="#8892b0" text-anchor="middle">UniquePermissionController</text>
+
+        <rect x="485" y="35" width="130" height="42" rx="6" fill="#fff" stroke="#bbdefb" stroke-width="1.5"/>
+        <text x="550" y="54" font-size="10" font-weight="600" fill="#1565c0" text-anchor="middle">ExternalSyncController</text>
+        <text x="550" y="68" font-size="9" fill="#8892b0" text-anchor="middle">GoogleDriveController</text>
+
+        <rect x="640" y="35" width="120" height="42" rx="6" fill="#fff" stroke="#bbdefb" stroke-width="1.5"/>
+        <text x="700" y="54" font-size="10" font-weight="600" fill="#1565c0" text-anchor="middle">CommentController</text>
+        <text x="700" y="68" font-size="9" fill="#8892b0" text-anchor="middle">AnnotationController</text>
+
+        <!-- Application: App Services -->
+        <rect x="30" y="128" width="120" height="42" rx="6" fill="#fff" stroke="#ffe082" stroke-width="1.5"/>
+        <text x="90" y="147" font-size="10" font-weight="600" fill="#e65100" text-anchor="middle">ItemAppService</text>
+        <text x="90" y="161" font-size="9" fill="#8892b0" text-anchor="middle">FolderAppService</text>
+
+        <rect x="175" y="128" width="130" height="42" rx="6" fill="#fff" stroke="#ffe082" stroke-width="1.5"/>
+        <text x="240" y="147" font-size="10" font-weight="600" fill="#e65100" text-anchor="middle">PublishAppService</text>
+        <text x="240" y="161" font-size="9" fill="#8892b0" text-anchor="middle">PublishJobAppService</text>
+
+        <rect x="330" y="128" width="130" height="42" rx="6" fill="#fff" stroke="#ffe082" stroke-width="1.5"/>
+        <text x="395" y="147" font-size="10" font-weight="600" fill="#e65100" text-anchor="middle">PermissionAppService</text>
+        <text x="395" y="161" font-size="9" fill="#8892b0" text-anchor="middle">TeamSiteAppService</text>
+
+        <rect x="485" y="128" width="130" height="42" rx="6" fill="#fff" stroke="#ffe082" stroke-width="1.5"/>
+        <text x="550" y="147" font-size="10" font-weight="600" fill="#e65100" text-anchor="middle">ExternalSyncAppService</text>
+        <text x="550" y="161" font-size="9" fill="#8892b0" text-anchor="middle"></text>
+
+        <rect x="640" y="128" width="120" height="42" rx="6" fill="#fff" stroke="#ffe082" stroke-width="1.5"/>
+        <text x="700" y="147" font-size="10" font-weight="600" fill="#e65100" text-anchor="middle">CommentAppService</text>
+        <text x="700" y="161" font-size="9" fill="#8892b0" text-anchor="middle"></text>
+
+        <!-- Domain layer -->
+        <rect x="30" y="222" width="120" height="82" rx="6" fill="#fff" stroke="#f8bbd0" stroke-width="2"/>
+        <text x="90" y="242" font-size="10" font-weight="700" fill="#c62828" text-anchor="middle">ItemEntity</text>
+        <text x="90" y="256" font-size="9" fill="#8892b0" text-anchor="middle">FolderEntity</text>
+        <text x="90" y="270" font-size="9" fill="#3b5bdb" text-anchor="middle">ItemStatus VO</text>
+        <text x="90" y="284" font-size="9" fill="#3b5bdb" text-anchor="middle">ExpirationPolicy VO</text>
+        <text x="90" y="297" font-size="8" fill="#aaa" text-anchor="middle">(aggregate roots)</text>
+
+        <rect x="175" y="222" width="130" height="82" rx="6" fill="#fff" stroke="#f8bbd0" stroke-width="2"/>
+        <text x="240" y="242" font-size="10" font-weight="700" fill="#c62828" text-anchor="middle">PublishJobEntity</text>
+        <text x="240" y="256" font-size="9" fill="#3b5bdb" text-anchor="middle">PublishMode VO</text>
+        <text x="240" y="270" font-size="9" fill="#3b5bdb" text-anchor="middle">ScheduledAt VO</text>
+        <text x="240" y="284" font-size="9" fill="#666" text-anchor="middle">PublishEligibilityService</text>
+
+        <rect x="330" y="222" width="130" height="82" rx="6" fill="#fff" stroke="#f8bbd0" stroke-width="2"/>
+        <text x="395" y="242" font-size="10" font-weight="700" fill="#c62828" text-anchor="middle">ContentPermissionSvc</text>
+        <text x="395" y="256" font-size="9" fill="#8892b0" text-anchor="middle">Permission inheritance</text>
+        <text x="395" y="270" font-size="9" fill="#8892b0" text-anchor="middle">cross-folder resolution</text>
+
+        <rect x="485" y="222" width="130" height="82" rx="6" fill="#fff" stroke="#f8bbd0" stroke-width="2"/>
+        <text x="550" y="242" font-size="10" font-weight="700" fill="#c62828" text-anchor="middle">ExternalSyncTaskEntity</text>
+        <text x="550" y="256" font-size="9" fill="#3b5bdb" text-anchor="middle">SyncProvider VO</text>
+        <text x="550" y="270" font-size="9" fill="#3b5bdb" text-anchor="middle">SyncCredential VO</text>
+        <text x="550" y="284" font-size="9" fill="#666" text-anchor="middle">ExternalSyncDomainSvc</text>
+
+        <rect x="640" y="222" width="120" height="82" rx="6" fill="#fff" stroke="#f8bbd0" stroke-width="2"/>
+        <text x="700" y="242" font-size="10" font-weight="700" fill="#c62828" text-anchor="middle">CommentEntity</text>
+        <text x="700" y="256" font-size="9" fill="#8892b0" text-anchor="middle">child of ItemEntity</text>
+        <text x="700" y="270" font-size="9" fill="#666" text-anchor="middle">ContentSearchSyncSvc</text>
+
+        <!-- Infrastructure -->
+        <!-- Repos -->
+        <rect x="30" y="360" width="100" height="36" rx="5" fill="#fff" stroke="#c8e6c9" stroke-width="1.5"/>
+        <text x="80" y="375" font-size="9.5" font-weight="600" fill="#2e7d32" text-anchor="middle">ItemRepository</text>
+        <text x="80" y="388" font-size="8.5" fill="#8892b0" text-anchor="middle">(SQL Server)</text>
+
+        <rect x="145" y="360" width="100" height="36" rx="5" fill="#fff" stroke="#c8e6c9" stroke-width="1.5"/>
+        <text x="195" y="375" font-size="9.5" font-weight="600" fill="#2e7d32" text-anchor="middle">FolderRepository</text>
+        <text x="195" y="388" font-size="8.5" fill="#8892b0" text-anchor="middle">(SQL Server)</text>
+
+        <rect x="260" y="360" width="110" height="36" rx="5" fill="#fff" stroke="#c8e6c9" stroke-width="1.5"/>
+        <text x="315" y="375" font-size="9.5" font-weight="600" fill="#2e7d32" text-anchor="middle">PublishJobRepository</text>
+        <text x="315" y="388" font-size="8.5" fill="#8892b0" text-anchor="middle">(SQL Server)</text>
+
+        <rect x="385" y="360" width="110" height="36" rx="5" fill="#fff" stroke="#c8e6c9" stroke-width="1.5"/>
+        <text x="440" y="375" font-size="9.5" font-weight="600" fill="#2e7d32" text-anchor="middle">SyncTaskRepository</text>
+        <text x="440" y="388" font-size="8.5" fill="#8892b0" text-anchor="middle">(SQL Server)</text>
+
+        <!-- Kafka -->
+        <rect x="510" y="355" width="120" height="46" rx="5" fill="#fff3e0" stroke="#ffe082" stroke-width="1.5"/>
+        <text x="570" y="372" font-size="9.5" font-weight="600" fill="#e65100" text-anchor="middle">SearchProducer</text>
+        <text x="570" y="385" font-size="8.5" fill="#8892b0" text-anchor="middle">→ search.ingest</text>
+        <text x="570" y="396" font-size="8.5" fill="#8892b0" text-anchor="middle">→ content-event</text>
+
+        <!-- BG Services -->
+        <rect x="645" y="355" width="120" height="46" rx="5" fill="#e8f5e9" stroke="#c8e6c9" stroke-width="1.5"/>
+        <text x="705" y="372" font-size="9.5" font-weight="600" fill="#2e7d32" text-anchor="middle">Event Consumers</text>
+        <text x="705" y="385" font-size="8.5" fill="#8892b0" text-anchor="middle">CrackingPipeline</text>
+        <text x="705" y="396" font-size="8.5" fill="#8892b0" text-anchor="middle">VirusScan · VFS</text>
+
+        <!-- External HTTP -->
+        <rect x="30" y="415" width="250" height="36" rx="5" fill="#ede7f6" stroke="#d1c4e9" stroke-width="1.5"/>
+        <text x="155" y="432" font-size="9.5" font-weight="600" fill="#6a1b9a" text-anchor="middle">HTTP Providers</text>
+        <text x="155" y="445" font-size="8.5" fill="#8892b0" text-anchor="middle">UMS · COS · Google Drive · OneDrive · Profile Service</text>
+
+        <!-- Cache -->
+        <rect x="300" y="415" width="180" height="36" rx="5" fill="#ede7f6" stroke="#d1c4e9" stroke-width="1.5"/>
+        <text x="390" y="432" font-size="9.5" font-weight="600" fill="#6a1b9a" text-anchor="middle">SeismicCacheProvider</text>
+        <text x="390" y="445" font-size="8.5" fill="#8892b0" text-anchor="middle">(Redis distributed cache)</text>
+
+        <!-- BG Polling -->
+        <rect x="500" y="415" width="160" height="36" rx="5" fill="#e8f5e9" stroke="#c8e6c9" stroke-width="1.5"/>
+        <text x="580" y="432" font-size="9.5" font-weight="600" fill="#2e7d32" text-anchor="middle">RLPollingBackgroundService</text>
+        <text x="580" y="445" font-size="8.5" fill="#8892b0" text-anchor="middle">SyncIndicatorBGService</text>
+
+        <!-- Kafka IN -->
+        <rect x="675" y="415" width="115" height="36" rx="5" fill="#fff3e0" stroke="#ffe082" stroke-width="1.5"/>
+        <text x="732" y="432" font-size="9.5" font-weight="600" fill="#e65100" text-anchor="middle">Kafka IN Topics</text>
+        <text x="732" y="445" font-size="8.5" fill="#8892b0" text-anchor="middle">ccp.meta · vfs · cms</text>
+
+        <!-- Arrows: Presentation → Application -->
+        <line x1="90" y1="77" x2="90" y2="128" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="240" y1="77" x2="240" y2="128" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="395" y1="77" x2="395" y2="128" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="550" y1="77" x2="550" y2="128" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="700" y1="77" x2="700" y2="128" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Arrows: Application → Domain -->
+        <line x1="90" y1="170" x2="90" y2="222" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="240" y1="170" x2="240" y2="222" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="395" y1="170" x2="395" y2="222" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="550" y1="170" x2="550" y2="222" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="700" y1="170" x2="700" y2="222" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Arrows: Domain → Infrastructure -->
+        <line x1="90" y1="304" x2="80" y2="360" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="90" y1="304" x2="195" y2="360" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="240" y1="304" x2="315" y2="360" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="550" y1="304" x2="440" y2="360" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="700" y1="304" x2="570" y2="360" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="700" y1="304" x2="705" y2="355" stroke="#b0bec5" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#b0bec5"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+  </div>
+
+  <!-- OBSERVABLE TRUTHS -->
+  <div class="section-gap">
+    <div class="section-title">Observable Truths (Post-Refactor)</div>
+    <div style="background:#fff;border-radius:10px;border:1.5px solid #e8ecf0;padding:20px;">
+      <p style="font-size:13px;color:#5a6474;margin-bottom:14px;">What must be TRUE for this refactor to be complete — without changing external behavior:</p>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;">
+        <li style="font-size:12.5px;color:#3d4a5c;display:flex;gap:8px;"><span style="color:#2ed573;font-weight:700;">✓</span>All item status transitions (draft→active→published→expired→quarantined) enforce invariants inside ItemEntity command methods</li>
+        <li style="font-size:12.5px;color:#3d4a5c;display:flex;gap:8px;"><span style="color:#2ed573;font-weight:700;">✓</span>FileWriter and CommentWriter classes are removed — mutations go through aggregate commands only</li>
+        <li style="font-size:12.5px;color:#3d4a5c;display:flex;gap:8px;"><span style="color:#2ed573;font-weight:700;">✓</span>AppService methods contain only orchestration: load → guard → mutate → persist → dispatch</li>
+        <li style="font-size:12.5px;color:#3d4a5c;display:flex;gap:8px;"><span style="color:#2ed573;font-weight:700;">✓</span>Orchestrators (IPublishOrchestrator, IFileOrchestrator, etc.) contain no domain rules — thin coordination only</li>
+        <li style="font-size:12.5px;color:#3d4a5c;display:flex;gap:8px;"><span style="color:#2ed573;font-weight:700;">✓</span>Kafka publish (content-event, search.ingest) is triggered by domain event handlers — not called directly from writers</li>
+        <li style="font-size:12.5px;color:#3d4a5c;display:flex;gap:8px;"><span style="color:#2ed573;font-weight:700;">✓</span>ContentManagerException is thrown only from the domain layer; HTTP status codes are resolved at the presentation layer</li>
+        <li style="font-size:12.5px;color:#3d4a5c;display:flex;gap:8px;"><span style="color:#2ed573;font-weight:700;">✓</span>All public API route paths, request shapes, and response shapes remain unchanged</li>
+        <li style="font-size:12.5px;color:#3d4a5c;display:flex;gap:8px;"><span style="color:#2ed573;font-weight:700;">✓</span>Permission checks are consolidated in ContentPermissionService — no duplicate permission logic in controllers or repositories</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
