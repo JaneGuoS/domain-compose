@@ -14,6 +14,7 @@
  *          once if validation fails.
  *
  * Usage:
+ *   node claude-analyze.js --url <github-url> [--out <name>]
  *   node claude-analyze.js --alias <service-alias> [--out <name>]
  *   node claude-analyze.js --dir /path/to/repo [--out <name>]
  */
@@ -28,18 +29,29 @@ const args = process.argv.slice(2);
 function flag(name) { const i = args.indexOf(name); return i !== -1 ? args[i + 1] : null; }
 
 const ALIAS       = flag('--alias');
+const URL_INPUT   = flag('--url');
 const DIR         = flag('--dir');
 const OUT         = flag('--out');
 const MAX_DOMAINS = parseInt(flag('--max-domains') || '0', 10) || null; // null = no limit
 
-if (!ALIAS && !DIR) {
-  console.error('Usage: node claude-analyze.js --alias <alias>|--dir <path> [--out <name>] [--max-domains N] [--fresh]');
+if (!ALIAS && !URL_INPUT && !DIR) {
+  console.error('Usage: node claude-analyze.js --url <github-url>|--alias <alias>|--dir <path> [--out <name>] [--max-domains N] [--fresh]');
   console.error('  --max-domains N  Cap the number of domains (e.g. 5 for high-level, 12 for granular)');
   process.exit(1);
 }
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
-const serviceName = OUT || (ALIAS ? ALIAS : path.basename(DIR));
+// Derive a service name from whichever input was provided
+function deriveServiceName() {
+  if (OUT) return OUT;
+  if (ALIAS) return ALIAS;
+  if (URL_INPUT) {
+    // e.g. https://github.com/seismic/channel-service → channel-service
+    return URL_INPUT.replace(/\.git$/, '').split('/').filter(Boolean).pop() || 'unknown-service';
+  }
+  return path.basename(DIR);
+}
+const serviceName = deriveServiceName();
 const projectRoot = path.resolve(path.join(__dirname, '..', '..'));
 const dataOutPath = path.join(projectRoot, 'backend', 'data', `${serviceName}.json`);
 fs.mkdirSync(path.join(projectRoot, 'docs'), { recursive: true });
@@ -70,7 +82,9 @@ if (!skillMdPath) {
   process.exit(1);
 }
 const skillContent = fs.readFileSync(skillMdPath, 'utf8');
+const inputLabel = URL_INPUT ? `url:${URL_INPUT}` : ALIAS ? `alias:${ALIAS}` : `dir:${DIR}`;
 console.error(`  Skill      : ${skillMdPath}`);
+console.error(`  Input      : ${inputLabel}`);
 console.error(`  Target     : ${serviceName}`);
 console.error(`  Max domains: ${MAX_DOMAINS || 'no limit'}`);
 console.error(`  Output     : ${dataOutPath}\n`);
@@ -281,9 +295,11 @@ Output ONLY a single valid JSON object (no markdown, no prose) with this structu
 }
 `;
 
-const inputArg = ALIAS
-  ? `seismic/${ALIAS} --refactor --yes`
-  : `${path.resolve(DIR)} --refactor --yes`;
+const inputArg = URL_INPUT
+  ? `${URL_INPUT} --refactor --yes`
+  : ALIAS
+    ? `seismic/${ALIAS} --refactor --yes`
+    : `${path.resolve(DIR)} --refactor --yes`;
 
 const P1_USER = `${inputArg}
 

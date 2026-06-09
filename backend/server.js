@@ -383,20 +383,26 @@ app.post('/api/jobs', (req, res) => {
   res.json({ jobId, service });
 });
 
-// POST /api/discover — { alias, out?, maxDomains? } → spawn claude with domain-compose skill
+// POST /api/discover — { url?, alias?, out?, maxDomains? } → spawn claude with domain-compose skill
+// Accepts a GitHub URL or a Seismic service alias (alias is legacy; prefer url).
 app.post('/api/discover', (req, res) => {
-  const { alias, out, maxDomains } = req.body || {};
-  if (!alias) return res.status(400).json({ error: '`alias` is required' });
+  const { url, alias, out, maxDomains } = req.body || {};
+  if (!url && !alias) return res.status(400).json({ error: '`url` or `alias` is required' });
 
   const jobId   = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const service = out || alias;
+  // Derive service name: explicit out > last URL path segment > alias
+  const service = out || (url
+    ? url.replace(/\.git$/, '').split('/').filter(Boolean).pop()
+    : alias);
   const domainNote = maxDomains ? ` · max ${maxDomains} domains` : '';
-  const job     = { status: 'running', logs: ['🚀 Spawning Claude with domain-compose skill…', `📋 Service: ${service}${domainNote}`, '⏱  Expect 10–20 minutes for a full analysis.'], service, error: null };
+  const inputNote  = url ? `🔗 URL: ${url}` : `📋 Service: ${service}`;
+  const job     = { status: 'running', logs: ['🚀 Spawning Claude with domain-compose skill…', inputNote + domainNote, '⏱  Expect 10–20 minutes for a full analysis.'], service, error: null };
   jobs.set(jobId, job);
 
   const scriptPath = path.join(__dirname, 'scripts', 'claude-analyze.js');
+  const inputArgs  = url ? ['--url', url] : ['--alias', alias];
   const scriptArgs = [
-    '--alias', alias,
+    ...inputArgs,
     ...(out ? ['--out', out] : []),
     ...(maxDomains ? ['--max-domains', String(maxDomains)] : []),
   ];

@@ -102,7 +102,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .ap-mode{display:flex;background:#F4F7FC;border:1px solid #E5E5E5;border-radius:8px;padding:3px;gap:2px;align-self:flex-start}
 .ap-mode-btn{padding:5px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:#9AA7B4;transition:all .15s}
 .ap-mode-btn.active{background:#fff;color:#1E1B3C;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.ap-mode-btn.seismic.active{background:#F15A24;color:#fff}
+.ap-mode-btn.url.active{background:#F15A24;color:#fff}
 
 /* Folder picker row */
 .ap-path-row{display:flex;gap:8px;align-items:stretch}
@@ -497,20 +497,26 @@ function WorkflowPanel({workflows,impact,selected,onSelect,filterDomainId}){
 }
 
 // ── SIDEBAR ───────────────────────────────────────────
-function Sidebar({domains,selected,onSelect,impact}){
+function Sidebar({domains,selected,onSelect,impact,view}){
+  const isAggView=view==='ddd';
+  const items=isAggView
+    ?domains.filter(d=>d.dddTarget?.aggregate&&!d.dddTarget.aggregate.includes('not found')&&!d.dddTarget.aggregate.includes('Delegated')&&!d.dddTarget.aggregate.includes('Coordinated'))
+    :domains;
   return h('aside',{className:'sidebar'},
-    h('div',{className:'sb-title'},'Domains'),
+    h('div',{className:'sb-title'},isAggView?'Aggregate Models':'Domains'),
     h('div',{className:'sb-item',style:{color:selected?'#9AA7B4':'#1E1B3C',fontWeight:selected?400:600},onClick:()=>onSelect(null)},
       h('span',{className:'sb-icon'},'🗂'),
-      h('span',null,'All domains')
+      h('span',null,isAggView?'All aggregates':'All domains')
     ),
-    domains.map(d=>{
+    items.map(d=>{
       const lvl=impact?.domainScores[d.id]?.level??'none';
-      const cls=['sb-item',selected===d.id?'selected':'',impact&&lvl!=='none'?`impact-${lvl}`:''].filter(Boolean).join(' ');
-      return h('div',{key:d.id,className:cls,onClick:()=>onSelect(d.id===selected?null:d.id)},
+      const key=isAggView?(d.dddTarget?.aggregate||d.id):d.id;
+      const cls=['sb-item',selected===key?'selected':'',impact&&lvl!=='none'?`impact-${lvl}`:''].filter(Boolean).join(' ');
+      const label=isAggView?(d.dddTarget?.aggregate||d.name):d.name;
+      return h('div',{key:key,className:cls,onClick:()=>onSelect(key===selected?null:key)},
         h('span',{className:'sb-icon'},d.icon),
-        h('span',null,d.name),
-        h('span',{className:`sb-health ${HEALTH_CLS[d.health]}`},d.health==='good'?'✅':d.health==='partial'?'🟡':'🔴')
+        h('span',null,label),
+        !isAggView&&h('span',{className:`sb-health ${HEALTH_CLS[d.health]}`},d.health==='good'?'✅':d.health==='partial'?'🟡':'🔴')
       );
     })
   );
@@ -657,18 +663,20 @@ function gridLayout(aggs, wfs){
   const posMap={};
   sorted.forEach((a,i)=>{
     const col=i%COLS, row=Math.floor(i/COLS);
-    posMap[a.id]={
+    const p={
       col, row,
       cx: col*(BOX_W+H_GAP)+BOX_W/2,
       cy: row*(BOX_H+V_GAP)+BOX_H/2,
       x:  col*(BOX_W+H_GAP),
       y:  row*(BOX_H+V_GAP),
     };
+    posMap[i]=p;                          // unique key by index (for renderBox)
+    if(posMap[a.id]==null)posMap[a.id]=p; // first occurrence wins (for arrow routing)
   });
   return{sorted, pos:posMap};
 }
 
-function AggregateDiagram({data}){
+function AggregateDiagram({data,highlightId}){
   if(!data)return null;
   const bc=data.boundedContext||{};
 
@@ -741,7 +749,7 @@ function AggregateDiagram({data}){
 
   // ── Single aggregate box — DDD UML style ──────────────
   function renderBox(d,i){
-    const p=pos[d.id];
+    const p=pos[i];
     if(!p)return null;
     const x=LEFT+p.x, y=TOP+p.y;
     const cx=x+BOX_W/2;
@@ -752,6 +760,7 @@ function AggregateDiagram({data}){
     const cmds=(t.commands||[]).slice(0,3);
     const invCount=(t.invariants||[]).length;
     const isCore=(i===0);
+    const isHighlighted=(t.aggregate===highlightId);
 
     // Row Y offsets within box (fixed, content fits within BOX_H=216)
     const yStereotype=14;
@@ -769,9 +778,11 @@ function AggregateDiagram({data}){
     const yFooter=BOX_H-20;
 
     return h('g',{key:d.id},
+      isHighlighted&&h('rect',{x:x-6,y:y-6,width:BOX_W+12,height:BOX_H+12,rx:11,fill:color,opacity:0.12}),
+      isHighlighted&&h('rect',{x:x-4,y:y-4,width:BOX_W+8,height:BOX_H+8,rx:9,fill:'none',stroke:color,strokeWidth:2.5,strokeDasharray:'5,3',opacity:0.7}),
       isCore&&h('rect',{x:x+3,y:y+3,width:BOX_W,height:BOX_H,rx:7,fill:'rgba(0,0,0,0.06)'}),
       // Box shell
-      h('rect',{x,y,width:BOX_W,height:BOX_H,rx:7,fill:'#fff',stroke:color,strokeWidth:isCore?2.5:1.5}),
+      h('rect',{x,y,width:BOX_W,height:BOX_H,rx:7,fill:isHighlighted?color+'0d':'#fff',stroke:color,strokeWidth:isHighlighted?3:isCore?2.5:1.5}),
       // Top accent strip
       h('rect',{x,y,width:BOX_W,height:5,rx:7,fill:color}),
       h('rect',{x,y:y+3,width:BOX_W,height:2,fill:color}),
@@ -955,7 +966,7 @@ function AggregateCards({domains,impact}){
       const t=d.dddTarget;
       const theme=AGG_THEMES[i%AGG_THEMES.length];
       const lvl=impact?.domainScores[d.id]?.level??'none';
-      return h('div',{key:d.id,className:`agg ${theme}`},
+      return h('div',{key:t.aggregate,id:'agg-'+t.aggregate,className:`agg ${theme}`},
         h('div',{className:'agg-hdr'},
           h('span',null,d.icon),
           h('span',null,t.aggregate),
@@ -1046,8 +1057,8 @@ function GapAnalysis({gaps,workflows}){
 
 // ── ANALYZE PANEL ─────────────────────────────────────
 function AnalyzePanel({onClose,onDone}){
-  const[mode,setMode]=useState('seismic'); // 'seismic' | 'local'
-  const[alias,setAlias]=useState('');
+  const[mode,setMode]=useState('url'); // 'url' | 'local'
+  const[url,setUrl]=useState('');
   const[dir,setDir]=useState('');
   const[out,setOut]=useState('');
   const[maxDomains,setMaxDomains]=useState(0); // 0 = no limit
@@ -1092,7 +1103,7 @@ function AnalyzePanel({onClose,onDone}){
     if(fileInputRef.current)fileInputRef.current.value='';
   };
 
-  const canSubmit=status!=='running'&&(mode==='seismic'?alias.trim():(pickedFiles||dir.trim()));
+  const canSubmit=status!=='running'&&(mode==='url'?url.trim():(pickedFiles||dir.trim()));
 
   const resetForm=()=>{setStatus('idle');setLogs([]);setErr(null);setJobId(null);};
   const switchMode=m=>{setMode(m);resetForm();};
@@ -1102,9 +1113,9 @@ function AnalyzePanel({onClose,onDone}){
     if(!canSubmit)return;
     setStatus('running');setLogs([]);setErr(null);
 
-    if(mode==='seismic'){
-      // Seismic alias mode: POST to /api/discover
-      const r=await fetch(`${API}/api/discover`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({alias:alias.trim(),out:out.trim()||undefined,maxDomains:maxDomains||undefined})});
+    if(mode==='url'){
+      // GitHub URL mode: POST to /api/discover
+      const r=await fetch(`${API}/api/discover`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url.trim(),out:out.trim()||undefined,maxDomains:maxDomains||undefined})});
       const d=await r.json();
       if(!r.ok){setStatus('error');setErr(d.error);return;}
       setJobId(d.jobId);setService(d.service);
@@ -1136,17 +1147,17 @@ function AnalyzePanel({onClose,onDone}){
 
         // Mode toggle
         h('div',{className:'ap-mode'},
-          h('button',{type:'button',className:`ap-mode-btn seismic${mode==='seismic'?' active':''}`,onClick:()=>switchMode('seismic')},'🔍 Seismic service'),
+          h('button',{type:'button',className:`ap-mode-btn url${mode==='url'?' active':''}`,onClick:()=>switchMode('url')},'🔗 GitHub URL'),
           h('button',{type:'button',className:`ap-mode-btn${mode==='local'?' active':''}`,onClick:()=>switchMode('local')},'📁 Local directory')
         ),
 
         // Hidden folder input (local mode)
         h('input',{type:'file',ref:fileInputRef,style:{display:'none'},webkitdirectory:'',directory:'',multiple:true,onChange:onFilesPicked}),
 
-        // Seismic alias mode
-        mode==='seismic'&&h('label',{className:'ap-label'},'Service alias',
-          h('input',{className:'ap-input',placeholder:'e.g. content-manager-service, ums, pns',value:alias,onChange:e=>setAlias(e.target.value),disabled:status==='running',autoFocus:true}),
-          h('span',{className:'ap-hint'},'Uses the real Seismic catalog + live Swagger spec — requires gh auth')
+        // GitHub URL mode
+        mode==='url'&&h('label',{className:'ap-label'},'GitHub repository URL',
+          h('input',{className:'ap-input',placeholder:'https://github.com/seismic/channel-service',value:url,onChange:e=>setUrl(e.target.value),disabled:status==='running',autoFocus:true}),
+          h('span',{className:'ap-hint'},'Clones the repo and runs a full DDD analysis — requires gh auth')
         ),
 
         // Local directory mode
@@ -1167,7 +1178,7 @@ function AnalyzePanel({onClose,onDone}){
 
         h('label',{className:'ap-label'},
           h('span',null,'Output name ',h('span',{className:'ap-optional'},'(optional)')),
-          h('input',{className:'ap-input',placeholder:`defaults to ${mode==='seismic'?'alias':'folder name'}`,value:out,onChange:e=>setOut(e.target.value),disabled:status==='running'})
+          h('input',{className:'ap-input',placeholder:`defaults to ${mode==='url'?'repo name':'folder name'}`,value:out,onChange:e=>setOut(e.target.value),disabled:status==='running'})
         ),
 
         // Domain count control
@@ -1196,7 +1207,7 @@ function AnalyzePanel({onClose,onDone}){
         ),
 
         h('button',{className:'ap-submit',type:'submit',disabled:!canSubmit},
-          status==='running'?'⏳ Analyzing…':mode==='seismic'?'Fetch from Catalog':'Run Analysis')
+          status==='running'?'⏳ Analyzing…':mode==='url'?'Analyze from URL':'Run Analysis')
       ),
 
       (logs.length>0||status!=='idle')&&h('div',{className:'ap-log-wrap'},
@@ -1225,6 +1236,7 @@ function App(){
   const[data,setData]=useState(null);
   const[impact,setImpact]=useState(null);
   const[selDomain,setSelDomain]=useState(null);
+  const[selAgg,setSelAgg]=useState(null);
   const[selWf,setSelWf]=useState(null);
   const[view,setView]=useState('current'); // 'current' | 'ddd' | 'gap'
   const[loading,setLoading]=useState(true);
@@ -1232,7 +1244,7 @@ function App(){
   const[impactLoading,setImpactLoading]=useState(false);
 
   const loadService=async name=>{
-    setLoading(true);setImpact(null);setSelDomain(null);setSelWf(null);
+    setLoading(true);setImpact(null);setSelDomain(null);setSelAgg(null);setSelWf(null);
     const r=await fetch(`${API}/api/analyze/${name}`);
     setData(await r.json());
     setActiveSvc(name);
@@ -1342,7 +1354,14 @@ function App(){
     // Main layout
     data&&h('div',{className:'layout'},
       // Sidebar hidden on gap view
-      view!=='gap'&&h(Sidebar,{domains:data.domains,selected:selDomain,onSelect:id=>{setSelDomain(id);setSelWf(null);},impact}),
+      view!=='gap'&&h(Sidebar,{
+        domains:data.domains,
+        selected:view==='ddd'?selAgg:selDomain,
+        onSelect:view==='ddd'
+          ?agg=>{setSelAgg(agg);if(agg)setTimeout(()=>{const el=document.getElementById('agg-'+agg);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},50);}
+          :id=>{setSelDomain(id);setSelWf(null);},
+        impact,view
+      }),
 
       h('main',{className:'content'},
         // Domain Map view
@@ -1387,13 +1406,13 @@ function App(){
 
         // DDD Target view
         view==='ddd'&&h('div',null,
-          h(AggregateDiagram,{data}),
+          h(AggregateDiagram,{data,highlightId:selAgg}),
           data.boundedContext&&h('div',null,
             h('div',{className:'sec-title'},'Bounded Context'),
             h(BoundedContextPanel,{bc:data.boundedContext})
           ),
-          h('div',{className:'sec-title'},selDomain?`${selectedDomain?.name} — Aggregate Model`:'Aggregate Models'),
-          h(AggregateCards,{domains:selDomain?data.domains.filter(d=>d.id===selDomain):data.domains,impact})
+          h('div',{className:'sec-title'},selAgg?`${selAgg} — Aggregate Model`:'Aggregate Models'),
+          h(AggregateCards,{domains:selAgg?data.domains.filter(d=>d.dddTarget?.aggregate===selAgg):data.domains,impact})
         ),
 
         // Gap Analysis view

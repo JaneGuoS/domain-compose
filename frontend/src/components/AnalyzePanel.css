@@ -32,6 +32,27 @@
 }
 .ap-close:hover { background: #F4F4F4; color: #1E1B3C; }
 
+/* Mode toggle */
+.ap-mode-toggle {
+  display: flex; gap: 0;
+  padding: 12px 20px 0;
+}
+.ap-mode-btn {
+  flex: 1; padding: 8px 12px;
+  background: #F4F6FA; border: 1px solid #D0DCF0;
+  font-size: 12px; font-weight: 600; color: #5B6F8A;
+  cursor: pointer; transition: background .12s, color .12s;
+}
+.ap-mode-btn:first-child { border-radius: 7px 0 0 7px; }
+.ap-mode-btn:last-child  { border-radius: 0 7px 7px 0; border-left: none; }
+.ap-mode-btn--active {
+  background: #1E1B3C; color: #fff; border-color: #1E1B3C;
+}
+.ap-mode-btn:hover:not(.ap-mode-btn--active):not(:disabled) {
+  background: #EAEEF5; color: #1E1B3C;
+}
+.ap-mode-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* Form */
 .ap-form {
   padding: 20px; display: flex; flex-direction: column; gap: 14px;

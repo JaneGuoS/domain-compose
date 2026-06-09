@@ -7,8 +7,11 @@ interface Props {
 }
 
 type JobStatus = 'idle' | 'running' | 'done' | 'error';
+type Mode = 'url' | 'local';
 
 export default function AnalyzePanel({ onClose, onDone }: Props) {
+  const [mode, setMode]       = useState<Mode>('url');
+  const [url, setUrl]         = useState('');
   const [dir, setDir]         = useState('');
   const [out, setOut]         = useState('');
   const [jobId, setJobId]     = useState<string | null>(null);
@@ -50,17 +53,23 @@ export default function AnalyzePanel({ onClose, onDone }: Props) {
     return () => clearInterval(pollRef.current!);
   }, [jobId, status]);
 
+  const canSubmit = mode === 'url' ? !!url.trim() : !!dir.trim();
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dir.trim()) return;
+    if (!canSubmit) return;
     setStatus('running');
     setLogs([]);
     setError(null);
     try {
-      const res  = await fetch('/api/jobs', {
+      const isUrl = mode === 'url';
+      const res = await fetch(isUrl ? '/api/discover' : '/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dir: dir.trim(), out: out.trim() || undefined }),
+        body: JSON.stringify(isUrl
+          ? { url: url.trim(), out: out.trim() || undefined }
+          : { dir: dir.trim(), out: out.trim() || undefined }
+        ),
       });
       const data = await res.json();
       if (!res.ok) { setStatus('error'); setError(data.error); return; }
@@ -70,6 +79,12 @@ export default function AnalyzePanel({ onClose, onDone }: Props) {
       setStatus('error');
       setError(err.message);
     }
+  };
+
+  const switchMode = (m: Mode) => {
+    if (status === 'running') return;
+    setMode(m);
+    setError(null);
   };
 
   const loadResult = () => { onDone(service); onClose(); };
@@ -83,21 +98,55 @@ export default function AnalyzePanel({ onClose, onDone }: Props) {
           <button className="ap-close" onClick={onClose}>✕</button>
         </div>
 
+        {/* Mode toggle */}
+        <div className="ap-mode-toggle">
+          <button
+            type="button"
+            className={`ap-mode-btn${mode === 'url' ? ' ap-mode-btn--active' : ''}`}
+            onClick={() => switchMode('url')}
+            disabled={status === 'running'}
+          >
+            🔗 GitHub URL
+          </button>
+          <button
+            type="button"
+            className={`ap-mode-btn${mode === 'local' ? ' ap-mode-btn--active' : ''}`}
+            onClick={() => switchMode('local')}
+            disabled={status === 'running'}
+          >
+            📁 Local path
+          </button>
+        </div>
+
         {/* Form */}
         <form className="ap-form" onSubmit={submit}>
+          {mode === 'url' ? (
+            <label className="ap-label">
+              GitHub repository URL
+              <input
+                className="ap-input"
+                placeholder="https://github.com/seismic/channel-service"
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                disabled={status === 'running'}
+                autoFocus
+              />
+            </label>
+          ) : (
+            <label className="ap-label">
+              Repo / directory path
+              <input
+                className="ap-input"
+                placeholder="/path/to/service-repo"
+                value={dir}
+                onChange={e => setDir(e.target.value)}
+                disabled={status === 'running'}
+                autoFocus
+              />
+            </label>
+          )}
           <label className="ap-label">
-            Repo / directory path
-            <input
-              className="ap-input"
-              placeholder="/path/to/service-repo"
-              value={dir}
-              onChange={e => setDir(e.target.value)}
-              disabled={status === 'running'}
-              autoFocus
-            />
-          </label>
-          <label className="ap-label">
-            Service name <span className="ap-optional">(optional — defaults to folder name)</span>
+            Service name <span className="ap-optional">(optional — defaults to repo name)</span>
             <input
               className="ap-input"
               placeholder="e.g. content-manager-service"
@@ -109,7 +158,7 @@ export default function AnalyzePanel({ onClose, onDone }: Props) {
           <button
             className="ap-submit"
             type="submit"
-            disabled={!dir.trim() || status === 'running'}
+            disabled={!canSubmit || status === 'running'}
           >
             {status === 'running' ? (
               <><span className="ap-spinner" /> Analyzing…</>
