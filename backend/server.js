@@ -4,6 +4,7 @@ const fs       = require('fs');
 const path     = require('path');
 const { exec } = require('child_process');
 const natural  = require('natural');
+const db       = require('./db');
 
 const DATA_DIR     = path.join(__dirname, 'data');
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
@@ -21,14 +22,12 @@ const STOP_WORDS = new Set([
   'when','where','which','who','all','any','each','per',
 ]);
 
-/** Tokenise → lowercase → remove stop words → stem */
 function normalise(text) {
   return tokenizer.tokenize(text.toLowerCase())
     .filter(w => w.length > 2 && !STOP_WORDS.has(w))
     .map(w => stemmer.stem(w));
 }
 
-/** Build a rich text blob for a domain (used as TF-IDF document) */
 function domainText(d) {
   return [
     d.name,
@@ -41,8 +40,17 @@ function domainText(d) {
   ].join(' ');
 }
 
-// ── Corpus cache (built once per service file, reused on every request) ──────
+// ── Corpus cache ──────────────────────────────────────────────────────────────
 const cache = new Map(); // serviceName → { data, tfidf, domainIndex }
+
+function buildCache(name, baseData, domains) {
+  const data = { ...baseData, domains };
+  const tfidf = new natural.TfIdf();
+  domains.forEach(d => tfidf.addDocument(normalise(domainText(d))));
+  const domainIndex = Object.fromEntries(domains.map((d, i) => [d.id, i]));
+  cache.set(name, { data, tfidf, domainIndex });
+  return cache.get(name);
+}
 
 function loadService(name) {
   if (cache.has(name)) return cache.get(name);
@@ -50,37 +58,15 @@ function loadService(name) {
   const file = path.join(DATA_DIR, `${name}.json`);
   if (!fs.existsSync(file)) return null;
 
-  const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-
-  // Build TF-IDF model: one document per domain
-  const tfidf = new natural.TfIdf();
-  data.domains.forEach(d => tfidf.addDocument(normalise(domainText(d))));
-
-  // Quick lookup: domain id → array index
-  const domainIndex = Object.fromEntries(data.domains.map((d, i) => [d.id, i]));
-
-  cache.set(name, { data, tfidf, domainIndex });
-  return cache.get(name);
+  const baseData = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const domains  = db.getDomains(name); // seeded from JSON on first call
+  return buildCache(name, baseData, domains);
 }
 
 // ── Impact scoring ────────────────────────────────────────────────────────────
-/**
- * Score each domain against `requirement` using TF-IDF.
- *
- * Algorithm:
- *  1. Tokenise + stem the requirement (same pipeline as corpus).
- *  2. For each domain document, sum the TF-IDF weight of every requirement token.
- *     TF-IDF rewards tokens that appear in *this* domain but not in every domain
- *     (i.e. discriminating, domain-specific terms score higher).
- *  3. Normalise scores to a 0–10 scale relative to the top-scoring domain.
- *  4. Apply a minimum absolute score gate before assigning levels, so a query
- *     with zero overlap never gets forced into 'direct'.
- */
 function scoreImpact(data, tfidf, requirement) {
-  const reqTokens = normalise(requirement);
-
-  // Build empty result scaffold
-  const domainScores   = {};
+  const reqTokens    = normalise(requirement);
+  const domainScores = {};
   const workflowScores = {};
 
   if (reqTokens.length === 0) {
@@ -91,44 +77,29 @@ function scoreImpact(data, tfidf, requirement) {
     return { requirement, domainScores, workflowScores };
   }
 
-  // Compute raw TF-IDF scores
   const rawScores = data.domains.map((d, idx) => {
     let raw = 0;
     reqTokens.forEach(token => { raw += tfidf.tfidf(token, idx); });
-
-    // Preserve original keyword/op highlights for the UI
     const words = requirement.toLowerCase().split(/\W+/).filter(w => w.length > 2);
     const matchedKeywords = (d.keywords   || []).filter(k => words.some(w => k.includes(w) || w.includes(k)));
     const matchedOps      = (d.operations || []).filter(op => words.some(w => op.toLowerCase().includes(w)));
-
     return { id: d.id, raw, matchedKeywords, matchedOps };
   });
 
-  const maxRaw = Math.max(...rawScores.map(r => r.raw));
-  // Minimum absolute score to be considered at all (prevents noise from generic queries)
+  const maxRaw   = Math.max(...rawScores.map(r => r.raw));
   const MIN_SIGNAL = maxRaw * 0.05;
 
   rawScores.forEach(({ id, raw, matchedKeywords, matchedOps }) => {
     const normalised = maxRaw > 0 ? (raw / maxRaw) * 10 : 0;
-    let level;
-    if (raw < MIN_SIGNAL || normalised < 0.5) {
-      level = 'none';
-    } else if (normalised >= 5) {
-      level = 'direct';
-    } else {
-      level = 'indirect';
-    }
-
+    const level = (raw < MIN_SIGNAL || normalised < 0.5) ? 'none'
+                : normalised >= 5 ? 'direct' : 'indirect';
     domainScores[id] = {
-      score:           Math.round(normalised * 100) / 100,
-      rawScore:        Math.round(raw * 1000) / 1000,
-      level,
-      matchedKeywords,
-      matchedOps,
+      score: Math.round(normalised * 100) / 100,
+      rawScore: Math.round(raw * 1000) / 1000,
+      level, matchedKeywords, matchedOps,
     };
   });
 
-  // Workflow level = highest level of its constituent domains
   const RANK  = { none: 0, indirect: 1, direct: 2 };
   const LABEL = ['none', 'indirect', 'direct'];
   data.workflows.forEach(wf => {
@@ -143,35 +114,76 @@ function scoreImpact(data, tfidf, requirement) {
 const app = express();
 app.use(express.json());
 
-// CORS
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
-// Serve compiled frontend (if present)
+// In dev, redirect to Vite dev server. In prod, serve the compiled build.
 app.get('/', (req, res) => {
-  const file = path.join(FRONTEND_DIR, 'index.html');
-  fs.existsSync(file) ? res.sendFile(file) : res.status(404).send('Frontend not found');
+  const built = path.join(FRONTEND_DIR, 'dist', 'index.html');
+  if (fs.existsSync(built)) return res.sendFile(built);
+  res.redirect('http://localhost:3000');
 });
 
-// GET /api/services — list available service JSON files
+// GET /api/services
 app.get('/api/services', (req, res) => {
-  const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json'));
+  const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json') && !f.startsWith('_'));
   res.json(files.map(f => f.replace('.json', '')));
 });
 
-// GET /api/analyze/:service — return full domain map
+// GET /api/analyze/:service
 app.get('/api/analyze/:service', (req, res) => {
   const entry = loadService(req.params.service);
   if (!entry) return res.status(404).json({ error: 'Service not found' });
   res.json(entry.data);
 });
 
-// POST /api/impact — { service, requirement } → TF-IDF impact scores
+// PATCH /api/services/:service/domains/:domainId — update existing domain
+app.patch('/api/services/:service/domains/:domainId', (req, res) => {
+  const { service, domainId } = req.params;
+  const domain = req.body;
+  if (!domain || domain.id !== domainId) return res.status(400).json({ error: 'Invalid domain payload' });
+
+  const file = path.join(DATA_DIR, `${service}.json`);
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'Service not found' });
+
+  db.upsertDomain(service, domain);
+  cache.delete(service);
+  res.json(domain);
+});
+
+// POST /api/services/:service/domains — add new domain
+app.post('/api/services/:service/domains', (req, res) => {
+  const { service } = req.params;
+  const domain = req.body;
+  if (!domain?.id || !domain?.name) return res.status(400).json({ error: 'id and name are required' });
+
+  const file = path.join(DATA_DIR, `${service}.json`);
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'Service not found' });
+
+  // Ensure service is seeded before adding so getDomains returns full list
+  loadService(service);
+  db.upsertDomain(service, domain);
+  cache.delete(service);
+  res.status(201).json(domain);
+});
+
+// DELETE /api/services/:service/domains/:domainId — soft-delete domain
+app.delete('/api/services/:service/domains/:domainId', (req, res) => {
+  const { service, domainId } = req.params;
+  const file = path.join(DATA_DIR, `${service}.json`);
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'Service not found' });
+
+  db.deleteDomain(service, domainId);
+  cache.delete(service);
+  res.sendStatus(204);
+});
+
+// POST /api/impact
 app.post('/api/impact', (req, res) => {
   const { service, requirement } = req.body || {};
   if (!service) return res.status(400).json({ error: '`service` is required' });
@@ -190,10 +202,9 @@ function openBrowser(url) {
   exec(cmd, err => { if (err) console.log(`  Open manually: ${url}`); });
 }
 
-const APP_URL = `http://localhost:${PORT}`;
 app.listen(PORT, () => {
   console.log(`\n✅  DomainCompose Studio`);
-  console.log(`   App  →  ${APP_URL}`);
-  console.log(`   API  →  ${APP_URL}/api\n`);
-  setTimeout(() => openBrowser(APP_URL), 500);
+  console.log(`   App  →  http://localhost:${PORT}`);
+  console.log(`   API  →  http://localhost:${PORT}/api\n`);
+  setTimeout(() => openBrowser(`http://localhost:${PORT}`), 500);
 });
