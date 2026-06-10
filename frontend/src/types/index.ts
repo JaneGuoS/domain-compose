@@ -10,6 +10,21 @@ export interface Workflow {
   steps: DomainStep[];
 }
 
+export interface DddCommand {
+  cmd: string;
+  event: string;
+}
+
+export interface DddTarget {
+  aggregate: string;
+  identity: string;
+  lifecycle: string[];
+  valueObjects: string[];
+  childEntities: string[];
+  invariants: string[];
+  commands: DddCommand[];
+}
+
 export interface Domain {
   id: string;
   name: string;
@@ -17,6 +32,7 @@ export interface Domain {
   health: 'good' | 'partial' | 'anemic';
   operations: string[];
   keywords: string[];
+  dddTarget?: DddTarget;
 }
 
 export interface ServiceData {

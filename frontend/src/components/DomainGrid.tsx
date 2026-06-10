@@ -6,12 +6,15 @@ interface Props {
   impact: ImpactResult | null;
   selectedWorkflow: string | null;
   workflows: Workflow[];
+  selected: string | null;
+  onSelect: (id: string | null) => void;
+  onEdit: (domain: Domain) => void;
+  onAdd: () => void;
 }
 
 const HEALTH_LABEL = { good: '✅ Rich model', partial: '🟡 Partial', anemic: '🔴 Anemic' };
 
-export default function DomainGrid({ domains, impact, selectedWorkflow, workflows }: Props) {
-  // Domains touched by selected workflow
+export default function DomainGrid({ domains, impact, selectedWorkflow, workflows, selected, onSelect, onEdit, onAdd }: Props) {
   const wfDomains = selectedWorkflow
     ? workflows.find(w => w.id === selectedWorkflow)?.domains ?? []
     : [];
@@ -24,11 +27,12 @@ export default function DomainGrid({ domains, impact, selectedWorkflow, workflow
         const cls = [
           'domain-card',
           impact ? `impact-${impactLevel}` : '',
-          inWorkflow ? 'in-workflow' : ''
+          inWorkflow ? 'in-workflow' : '',
+          selected === d.id ? 'selected' : '',
         ].filter(Boolean).join(' ');
 
         return (
-          <div key={d.id} className={cls}>
+          <div key={d.id} className={cls} onClick={() => onSelect(d.id === selected ? null : d.id)}>
             <div className="dc-header">
               <span className="dc-icon">{d.icon}</span>
               <span className="dc-name">{d.name}</span>
@@ -37,6 +41,7 @@ export default function DomainGrid({ domains, impact, selectedWorkflow, workflow
                   {impactLevel === 'direct' ? '🔴 IMPACTED' : '🟡 AFFECTED'}
                 </span>
               )}
+              <button className="dc-edit-btn" title="Edit domain" onClick={e => { e.stopPropagation(); onEdit(d); }}>✏️</button>
             </div>
             <div className="dc-health">{HEALTH_LABEL[d.health]}</div>
             <ul className="dc-ops">
@@ -50,6 +55,12 @@ export default function DomainGrid({ domains, impact, selectedWorkflow, workflow
           </div>
         );
       })}
+
+      {/* Add domain card */}
+      <div className="domain-card domain-card-add" onClick={onAdd} title="Add a new domain">
+        <span className="dc-add-icon">+</span>
+        <span className="dc-add-label">Add Domain</span>
+      </div>
     </div>
   );
 }

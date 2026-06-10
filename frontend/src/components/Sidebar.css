@@ -1,0 +1,56 @@
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid #E5E5E5;
+  padding: 16px 0;
+  position: sticky;
+  top: 56px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+}
+
+.sb-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #9AA7B4;
+  padding: 0 16px;
+  margin-bottom: 8px;
+}
+
+.sb-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background .15s;
+  border-left: 3px solid transparent;
+  font-size: 13px;
+  color: #3D3D5C;
+}
+.sb-item:hover { background: #F4F7FC; }
+.sb-item.selected {
+  background: #FFF3EF;
+  border-left-color: #F15A24;
+  color: #1E1B3C;
+  font-weight: 600;
+}
+.sb-item.impact-direct { background: #FFF5F5; }
+.sb-item.impact-indirect { background: #FFFDE7; }
+
+.sb-icon { font-size: 16px; flex-shrink: 0; }
+.sb-name { flex: 1; }
+.sb-health {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.health-good    { background: #E8F5E9; color: #2E7D32; }
+.health-partial { background: #FFF8E1; color: #7A5000; }
+.health-anemic  { background: #FFEBEE; color: #C62828; }
+
+@media (max-width: 900px) { .sidebar { display: none; } }
