@@ -5,6 +5,7 @@ const path          = require('path');
 const os            = require('os');
 const { exec, spawn } = require('child_process');
 const natural       = require('natural');
+const sqliteDb      = require('./db');
 
 const DATA_DIR     = path.join(__dirname, 'data');
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
@@ -52,6 +53,9 @@ function loadService(name) {
   if (!fs.existsSync(file)) return null;
 
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+
+  // Merge any manual SQLite edits on top of the base JSON
+  data.domains = sqliteDb.applyEdits(name, data.domains);
 
   // Build TF-IDF model: one document per domain
   const tfidf = new natural.TfIdf();
@@ -277,7 +281,7 @@ app.use(express.json({ limit: '50mb' }));
 // CORS
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -293,6 +297,54 @@ app.get('/', (req, res) => {
 app.get('/api/services', (req, res) => {
   const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json'));
   res.json(files.map(f => f.replace('.json', '')));
+});
+
+// PATCH /api/services/:service/domains/:domainId — persist manual domain edits to SQLite
+app.patch('/api/services/:service/domains/:domainId', (req, res) => {
+  const { service, domainId } = req.params;
+  const patch = req.body;
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch))
+    return res.status(400).json({ error: 'Patch body must be a plain JSON object' });
+
+  const file = path.join(DATA_DIR, `${service}.json`);
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'Service not found' });
+
+  sqliteDb.upsertEdit(service, domainId, patch);
+  cache.delete(service);
+
+  const fresh = loadService(service);
+  res.json(fresh.data);
+});
+
+// POST /api/services/:service/domains — add a new domain (persisted in SQLite)
+app.post('/api/services/:service/domains', (req, res) => {
+  const { service } = req.params;
+  const domain = req.body;
+  if (!domain?.id || !domain?.name)
+    return res.status(400).json({ error: '`id` and `name` are required' });
+
+  const file = path.join(DATA_DIR, `${service}.json`);
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'Service not found' });
+
+  sqliteDb.upsertEdit(service, domain.id, domain);
+  cache.delete(service);
+
+  const fresh = loadService(service);
+  res.json(fresh.data);
+});
+
+// DELETE /api/services/:service/domains/:domainId — hide a domain (persisted in SQLite)
+app.delete('/api/services/:service/domains/:domainId', (req, res) => {
+  const { service, domainId } = req.params;
+
+  const file = path.join(DATA_DIR, `${service}.json`);
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'Service not found' });
+
+  sqliteDb.deleteEdit(service, domainId);
+  cache.delete(service);
+
+  const fresh = loadService(service);
+  res.json(fresh.data);
 });
 
 // GET /api/analyze/:service — return full domain map

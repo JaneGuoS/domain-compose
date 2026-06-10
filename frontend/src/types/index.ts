@@ -1,3 +1,18 @@
+export interface DomainCommand {
+  cmd: string;
+  event: string;
+}
+
+export interface DddTarget {
+  aggregate?: string;
+  identity?: string;
+  lifecycle?: string[];
+  valueObjects?: string[];
+  childEntities?: string[];
+  invariants?: string[];
+  commands?: DomainCommand[];
+}
+
 export interface DomainStep {
   label: string;
   type: 'api' | 'domain' | 'kafka' | 'background' | 'external' | 'violation';
@@ -17,6 +32,7 @@ export interface Domain {
   health: 'good' | 'partial' | 'anemic';
   operations: string[];
   keywords: string[];
+  dddTarget?: DddTarget;
 }
 
 export interface ServiceData {

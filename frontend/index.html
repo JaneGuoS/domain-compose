@@ -181,25 +181,81 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 /* DOMAIN GRID */
 .domain-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
-.dc{background:#fff;border:1.5px solid #E5E5E5;border-radius:10px;padding:12px;transition:all .25s;cursor:pointer}
+.dc{background:#fff;border:1.5px solid #E5E5E5;border-radius:10px;padding:12px;transition:all .25s;cursor:pointer;overflow:hidden;min-width:0}
 .dc:hover{border-color:#D0DCF0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .dc.selected{border-color:#F15A24;box-shadow:0 0 0 3px rgba(241,90,36,.12)}
 .dc.d-direct{border-color:#EF5350;background:#FFF5F5;transform:translateY(-2px);box-shadow:0 0 0 3px rgba(239,83,80,.12)}
 .dc.d-indirect{border-color:#FFC107;background:#FFFDE7}
 .dc.d-none{opacity:.4}
-.dc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:5px}
-.dc-icon{font-size:18px}
-.dc-name{font-size:12px;font-weight:700;flex:1}
-.dc-ibadge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px}
+.dc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-width:0}
+.dc-icon{font-size:18px;flex-shrink:0}
+.dc-name{font-size:12px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-ibadge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;white-space:nowrap}
 .dc-ibadge.direct{background:#FFEBEE;color:#C62828}
 .dc-ibadge.indirect{background:#FFF8E1;color:#7A5000}
 .dc-health{font-size:10px;color:#9AA7B4;margin-bottom:6px}
 .dc-ops{list-style:none;display:flex;flex-direction:column;gap:2px}
-.dc-ops li{font-size:10.5px;color:#5B6F8A;padding-left:10px;position:relative;line-height:1.5}
+.dc-ops li{font-size:10.5px;color:#5B6F8A;padding-left:10px;position:relative;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dc-ops li::before{content:'·';position:absolute;left:0;color:#D0DCF0}
 .dc-ops li.op-hit{color:#C62828;font-weight:600}
 .dc-ops li.op-hit::before{color:#EF5350}
 .dc-ops li.op-more{color:#C0C8D4;font-style:italic}
+
+/* EDIT BUTTON on domain card */
+.dc-edit-btn{opacity:0;pointer-events:none;background:none;border:none;cursor:pointer;font-size:13px;padding:2px 5px;border-radius:4px;color:#6B7280;line-height:1;flex-shrink:0;transition:opacity .15s,background .15s,color .15s}
+.dc:hover .dc-edit-btn{opacity:1;pointer-events:auto}
+.dc-edit-btn:hover{background:#EEF2FF;color:#4F46E5}
+.dc-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:none;border:1.5px dashed #C8D0DC;border-radius:10px;padding:12px;cursor:pointer;min-height:90px;transition:border-color .2s,background .2s}
+.dc-add:hover{border-color:#6366F1;background:#F5F3FF}
+.dc-add-icon{font-size:22px;color:#9AA7B4}
+.dc-add-lbl{font-size:11px;font-weight:600;color:#9AA7B4}
+.dc-add:hover .dc-add-icon,.dc-add:hover .dc-add-lbl{color:#6366F1}
+
+/* TOAST */
+.toast-wrap{position:fixed;bottom:24px;right:24px;z-index:500;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:10px;font-size:13px;font-weight:500;color:#fff;box-shadow:0 4px 20px rgba(0,0,0,.18);pointer-events:auto;animation:toast-in .2s ease}
+.toast-success{background:#16A34A}
+.toast-danger{background:#DC2626}
+@keyframes toast-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* DOMAIN EDIT MODAL */
+.dem-ov{position:fixed;inset:0;z-index:300;background:rgba(10,10,30,.45);display:flex;align-items:center;justify-content:center;padding:24px}
+.dem-panel{background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.18);width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.dem-hdr{display:flex;align-items:center;padding:18px 20px 14px;border-bottom:1px solid #EAEDF2}
+.dem-title{font-size:15px;font-weight:700;color:#1E1B3C;flex:1}
+.dem-x{background:none;border:none;cursor:pointer;font-size:16px;color:#9AA7B4;padding:4px 8px;border-radius:6px}
+.dem-x:hover{background:#F1F5F9;color:#1E1B3C}
+.dem-tabs{display:flex;gap:4px;padding:10px 20px 0;border-bottom:1px solid #EAEDF2}
+.dem-tab{background:none;border:none;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:500;color:#6B7280;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:6px 6px 0 0}
+.dem-tab:hover{color:#4F46E5}
+.dem-tab.active{color:#4F46E5;border-bottom-color:#4F46E5}
+.dem-body{padding:16px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px}
+.dem-lbl{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;display:block}
+.dem-hint{font-size:11px;color:#9AA7B4;font-weight:400}
+.dem-row{display:flex;gap:12px}
+.dem-input,.dem-ta,.dem-sel{border:1.5px solid #E5E7EB;border-radius:7px;padding:7px 10px;font-size:13px;color:#1E1B3C;font-family:inherit;background:#FAFAFA;width:100%;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+.dem-input:focus,.dem-ta:focus,.dem-sel:focus{outline:none;border-color:#6366F1;box-shadow:0 0 0 3px rgba(99,102,241,.12);background:#fff}
+.dem-ta{resize:vertical;min-height:72px}
+.dem-cmd-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.dem-cmd-row .dem-input{flex:1;min-width:0}
+.dem-cmd-arrow{color:#9AA7B4;font-size:14px;flex-shrink:0}
+.dem-cmd-rm{background:none;border:none;cursor:pointer;color:#9AA7B4;font-size:13px;padding:4px 6px;border-radius:5px}
+.dem-cmd-rm:hover{background:#FEE2E2;color:#DC2626}
+.dem-add-cmd{background:none;border:1.5px dashed #D1D5DB;border-radius:6px;padding:6px 12px;font-size:12px;color:#6B7280;cursor:pointer;width:100%;text-align:center;margin-top:4px}
+.dem-add-cmd:hover{border-color:#6366F1;color:#4F46E5;background:#F5F3FF}
+.dem-ftr{display:flex;align-items:center;padding:14px 20px;border-top:1px solid #EAEDF2;gap:8px}
+.dem-ftr-r{display:flex;gap:8px;margin-left:auto}
+.dem-confirm{display:flex;align-items:center;gap:8px}
+.dem-confirm-msg{font-size:12px;color:#DC2626;font-weight:500}
+.dem-btn{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .15s}
+.dem-btn-primary{background:#4F46E5;color:#fff;border-color:#4F46E5}
+.dem-btn-primary:hover{background:#4338CA}
+.dem-btn-ghost{background:none;color:#374151;border-color:#E5E7EB}
+.dem-btn-ghost:hover{background:#F9FAFB}
+.dem-btn-danger{background:#DC2626;color:#fff;border-color:#DC2626}
+.dem-btn-danger:hover{background:#B91C1C}
+.dem-btn-dg{background:none;color:#DC2626;border-color:transparent;margin-right:auto}
+.dem-btn-dg:hover{background:#FEF2F2}
 
 /* DOMAIN DETAIL PANEL */
 .detail-panel{background:#fff;border:1.5px solid #E5E5E5;border-radius:12px;padding:20px;margin-bottom:24px}
@@ -407,7 +463,7 @@ function DomainDetail({domain,impact,onClose}){
 }
 
 // ── DOMAIN GRID (current view) ────────────────────────
-function DomainGrid({domains,impact,selected,onSelect}){
+function DomainGrid({domains,impact,selected,onSelect,onEdit,onAdd}){
   return h('div',{className:'domain-grid'},
     domains.map(d=>{
       const lvl=impact?.domainScores[d.id]?.level??'none';
@@ -416,7 +472,8 @@ function DomainGrid({domains,impact,selected,onSelect}){
         h('div',{className:'dc-hdr'},
           h('span',{className:'dc-icon'},d.icon),
           h('span',{className:'dc-name'},d.name),
-          impact&&lvl!=='none'&&h('span',{className:`dc-ibadge ${lvl}`},lvl==='direct'?'🔴':'🟡')
+          impact&&lvl!=='none'&&h('span',{className:`dc-ibadge ${lvl}`},lvl==='direct'?'🔴':'🟡'),
+          onEdit&&h('button',{className:'dc-edit-btn',title:'Edit domain',onClick:e=>{e.stopPropagation();onEdit(d);}},'✏️')
         ),
         h('div',{className:'dc-health'},HEALTH_LABEL[d.health]),
         h('ul',{className:'dc-ops'},
@@ -424,7 +481,102 @@ function DomainGrid({domains,impact,selected,onSelect}){
           d.operations.length>3&&h('li',{key:'more',className:'op-more'},`+${d.operations.length-3} more`)
         )
       );
-    })
+    }),
+    onAdd&&h('button',{key:'__add',className:'dc dc-add',onClick:onAdd},
+      h('span',{className:'dc-add-icon'},'＋'),
+      h('span',{className:'dc-add-lbl'},'Add Domain')
+    )
+  );
+}
+
+// ── DOMAIN EDIT MODAL ────────────────────────────────
+function DomainEditModal({domain,isNew,onSave,onDelete,onClose}){
+  const TABS=['basic','ddd'];
+  const[tab,setTab]=useState('basic');
+  const[confirmDel,setConfirmDel]=useState(false);
+  const toLines=arr=>(arr||[]).join('\n');
+  const fromLines=s=>s.split('\n').map(l=>l.trim()).filter(Boolean);
+  const[f,setF]=useState(()=>{
+    if(!domain||isNew)return{id:'',name:'',icon:'📦',health:'partial',ops:'',aggregate:'',identity:'',valueObjects:'',lifecycle:'',childEntities:'',invariants:'',commands:[]};
+    const t=domain.dddTarget||{};
+    return{id:domain.id,name:domain.name,icon:domain.icon,health:domain.health,
+      ops:toLines(domain.operations),aggregate:t.aggregate||'',identity:t.identity||'',
+      valueObjects:toLines(t.valueObjects),lifecycle:toLines(t.lifecycle),
+      childEntities:toLines(t.childEntities),invariants:toLines(t.invariants),
+      commands:t.commands?[...t.commands]:[]};
+  });
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const addCmd=()=>setF(p=>({...p,commands:[...p.commands,{cmd:'',event:''}]}));
+  const updCmd=(i,k,v)=>setF(p=>{const c=[...p.commands];c[i]={...c[i],[k]:v};return{...p,commands:c};});
+  const rmCmd=i=>setF(p=>({...p,commands:p.commands.filter((_,j)=>j!==i)}));
+  const submit=e=>{
+    e.preventDefault();
+    if(!f.name.trim())return;
+    if(isNew&&!f.id.trim())return;
+    onSave({id:f.id.trim(),name:f.name.trim(),icon:f.icon.trim()||'📦',health:f.health,
+      operations:fromLines(f.ops),
+      dddTarget:{aggregate:f.aggregate.trim()||undefined,identity:f.identity.trim()||undefined,
+        lifecycle:fromLines(f.lifecycle),valueObjects:fromLines(f.valueObjects),
+        childEntities:fromLines(f.childEntities),invariants:fromLines(f.invariants),
+        commands:f.commands.filter(c=>c.cmd.trim())}});
+  };
+  return h('div',{className:'dem-ov',onClick:e=>{if(e.target===e.currentTarget)onClose();}},
+    h('div',{className:'dem-panel'},
+      h('div',{className:'dem-hdr'},
+        h('span',{className:'dem-title'},isNew?'➕ Add Domain':'✏️ Edit Domain'),
+        h('button',{className:'dem-x',onClick:onClose},'✕')
+      ),
+      h('div',{className:'dem-tabs'},
+        TABS.map(t=>h('button',{key:t,type:'button',className:`dem-tab${tab===t?' active':''}`,onClick:()=>setTab(t)},t==='basic'?'Basic Info':'DDD Target'))
+      ),
+      h('form',{onSubmit:submit,style:{display:'flex',flexDirection:'column',flex:1,overflow:'hidden'}},
+        h('div',{className:'dem-body'},
+          tab==='basic'&&h(React.Fragment,null,
+            isNew&&h('label',null,h('span',{className:'dem-lbl'},'Domain ID *'),h('input',{className:'dem-input',value:f.id,onChange:e=>set('id',e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'-')),placeholder:'e.g. billing',required:true}),h('span',{className:'dem-hint'},'Lowercase, hyphens only')),
+            h('div',{className:'dem-row'},
+              h('div',{style:{width:72}},h('span',{className:'dem-lbl'},'Icon'),h('input',{className:'dem-input',value:f.icon,onChange:e=>set('icon',e.target.value),maxLength:4})),
+              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Name *'),h('input',{className:'dem-input',value:f.name,onChange:e=>set('name',e.target.value),required:true}))
+            ),
+            h('div',null,h('span',{className:'dem-lbl'},'Health'),h('select',{className:'dem-sel',value:f.health,onChange:e=>set('health',e.target.value)},h('option',{value:'good'},'✅ Rich model'),h('option',{value:'partial'},'🟡 Partial'),h('option',{value:'anemic'},'🔴 Anemic'))),
+            h('div',null,h('span',{className:'dem-lbl'},'Operations ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:6,value:f.ops,onChange:e=>set('ops',e.target.value),placeholder:'CreateFile\nUpdateFile'}))
+          ),
+          tab==='ddd'&&h(React.Fragment,null,
+            h('div',{className:'dem-row'},
+              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Aggregate Root'),h('input',{className:'dem-input',value:f.aggregate,onChange:e=>set('aggregate',e.target.value),placeholder:'e.g. FileEntity'})),
+              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Identity'),h('input',{className:'dem-input',value:f.identity,onChange:e=>set('identity',e.target.value),placeholder:'e.g. Id (GUID)'}))
+            ),
+            h('div',{className:'dem-row'},
+              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Value Objects ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:4,value:f.valueObjects,onChange:e=>set('valueObjects',e.target.value)})),
+              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Child Entities ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:4,value:f.childEntities,onChange:e=>set('childEntities',e.target.value)}))
+            ),
+            h('div',null,h('span',{className:'dem-lbl'},'Lifecycle States ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:3,value:f.lifecycle,onChange:e=>set('lifecycle',e.target.value)})),
+            h('div',null,h('span',{className:'dem-lbl'},'Invariants ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:4,value:f.invariants,onChange:e=>set('invariants',e.target.value)})),
+            h('div',null,
+              h('span',{className:'dem-lbl'},'Commands'),
+              f.commands.map((c,i)=>h('div',{key:i,className:'dem-cmd-row'},
+                h('input',{className:'dem-input',value:c.cmd,onChange:e=>updCmd(i,'cmd',e.target.value),placeholder:'Checkout(actorId)'}),
+                h('span',{className:'dem-cmd-arrow'},'→'),
+                h('input',{className:'dem-input',value:c.event,onChange:e=>updCmd(i,'event',e.target.value),placeholder:'FileCheckedOut'}),
+                h('button',{type:'button',className:'dem-cmd-rm',onClick:()=>rmCmd(i)},'✕')
+              )),
+              h('button',{type:'button',className:'dem-add-cmd',onClick:addCmd},'+ Add command')
+            )
+          )
+        ),
+        h('div',{className:'dem-ftr'},
+          !isNew&&onDelete&&!confirmDel&&h('button',{type:'button',className:'dem-btn dem-btn-dg',onClick:()=>setConfirmDel(true)},'Remove domain'),
+          !isNew&&confirmDel&&h('div',{className:'dem-confirm'},
+            h('span',{className:'dem-confirm-msg'},'Remove this domain?'),
+            h('button',{type:'button',className:'dem-btn dem-btn-danger',onClick:()=>onDelete(domain.id)},'Yes, remove'),
+            h('button',{type:'button',className:'dem-btn dem-btn-ghost',onClick:()=>setConfirmDel(false)},'Cancel')
+          ),
+          h('div',{className:'dem-ftr-r'},
+            h('button',{type:'button',className:'dem-btn dem-btn-ghost',onClick:onClose},'Cancel'),
+            h('button',{type:'submit',className:'dem-btn dem-btn-primary'},isNew?'Add domain':'Save changes')
+          )
+        )
+      )
+    )
   );
 }
 
@@ -1242,6 +1394,15 @@ function App(){
   const[loading,setLoading]=useState(true);
   const[showAnalyze,setShowAnalyze]=useState(false);
   const[impactLoading,setImpactLoading]=useState(false);
+  const[editDomain,setEditDomain]=useState(null); // domain object or null
+  const[isNewDomain,setIsNewDomain]=useState(false);
+  const[toasts,setToasts]=useState([]);
+
+  const showToast=(msg,type='success')=>{
+    const id=Date.now();
+    setToasts(t=>[...t,{id,msg,type}]);
+    setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),3000);
+  };
 
   const loadService=async name=>{
     setLoading(true);setImpact(null);setSelDomain(null);setSelAgg(null);setSelWf(null);
@@ -1281,6 +1442,34 @@ function App(){
   const handleAnalyzeDone=async svc=>{
     const list=await refreshServices();
     loadService(list.includes(svc)?svc:list[0]);
+  };
+
+  const handleSaveDomain=async patch=>{
+    if(!activeSvc)return;
+    const url=isNewDomain
+      ?`${API}/api/services/${activeSvc}/domains`
+      :`${API}/api/services/${activeSvc}/domains/${patch.id}`;
+    const r=await fetch(url,{method:isNewDomain?'POST':'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+    if(r.ok){
+      setData(await r.json());
+      showToast(isNewDomain?`✅ Domain "${patch.name}" added`:`✅ "${patch.name}" saved`);
+    } else {
+      showToast('❌ Failed to save changes','danger');
+    }
+    setEditDomain(null);setIsNewDomain(false);
+  };
+
+  const handleDeleteDomain=async domainId=>{
+    if(!activeSvc)return;
+    const name=data.domains.find(d=>d.id===domainId)?.name||domainId;
+    const r=await fetch(`${API}/api/services/${activeSvc}/domains/${domainId}`,{method:'DELETE'});
+    if(r.ok){
+      setData(await r.json());
+      showToast(`🗑 "${name}" removed`,'danger');
+    } else {
+      showToast('❌ Failed to remove domain','danger');
+    }
+    setEditDomain(null);
   };
 
   if(loading&&!data)return h('div',{className:'loading'},h('div',{className:'spinner'}),h('p',null,'Loading service…'));
@@ -1381,7 +1570,8 @@ function App(){
                   h('span',{className:'dc-icon'},d.icon),
                   h('span',{className:'dc-name'},d.name),
                   impact&&lvl!=='none'&&h('span',{className:`dc-ibadge ${lvl}`},lvl==='direct'?'🔴 Direct':'🟡 Indirect'),
-                  vio&&!impact&&h('span',{className:`vio-badge ${vio}`},vio)
+                  vio&&!impact&&h('span',{className:`vio-badge ${vio}`},vio),
+                  h('button',{className:'dc-edit-btn',title:'Edit domain',onClick:e=>{e.stopPropagation();setEditDomain(d);setIsNewDomain(false);}},'✏️')
                 ),
                 h('div',{className:'dc-health'},HEALTH_LABEL[d.health]),
                 // Show Claude's reason when impact is active
@@ -1391,7 +1581,11 @@ function App(){
                   d.operations.length>3&&h('li',{key:'more',className:'op-more'},`+${d.operations.length-3} more`)
                 )
               );
-            })
+            }),
+            h('button',{key:'__add',className:'dc dc-add',onClick:e=>{e.stopPropagation();setEditDomain(null);setIsNewDomain(true);}},
+              h('span',{className:'dc-add-icon'},'＋'),
+              h('span',{className:'dc-add-lbl'},'Add Domain')
+            )
           ),
           h('div',{className:'sec-title',style:{marginTop:28}},selDomain?`${selectedDomain?.name} — Workflows`:'Key Workflows'),
           h(WorkflowPanel,{workflows:data.workflows,impact:impact?{...impact,workflowImpacts:impact.workflowImpacts}:null,selected:selWf,onSelect:setSelWf,filterDomainId:selDomain}),
@@ -1424,7 +1618,13 @@ function App(){
     ),
 
     // Analyze panel modal
-    showAnalyze&&h(AnalyzePanel,{onClose:()=>setShowAnalyze(false),onDone:handleAnalyzeDone})
+    showAnalyze&&h(AnalyzePanel,{onClose:()=>setShowAnalyze(false),onDone:handleAnalyzeDone}),
+    // Domain edit/add modal
+    (editDomain||isNewDomain)&&h(DomainEditModal,{domain:editDomain,isNew:isNewDomain,onSave:handleSaveDomain,onDelete:isNewDomain?undefined:handleDeleteDomain,onClose:()=>{setEditDomain(null);setIsNewDomain(false);}}),
+    // Toasts
+    toasts.length>0&&h('div',{className:'toast-wrap'},
+      toasts.map(t=>h('div',{key:t.id,className:`toast toast-${t.type}`},t.msg))
+    )
   );
 }
 

@@ -1,0 +1,141 @@
+/* Overlay */
+.dem-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(10, 10, 30, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+
+/* Panel */
+.dem-panel {
+  background: #fff; border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .18);
+  width: 100%; max-width: 680px;
+  max-height: 90vh; display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.dem-header {
+  display: flex; align-items: center;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #EAEDF2;
+}
+.dem-title { font-size: 15px; font-weight: 700; color: #1E1B3C; flex: 1; }
+.dem-close {
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; color: #9AA7B4;
+  padding: 4px 8px; border-radius: 6px;
+  transition: background .15s;
+}
+.dem-close:hover { background: #F1F5F9; color: #1E1B3C; }
+
+/* Tabs */
+.dem-tabs {
+  display: flex; gap: 4px;
+  padding: 10px 20px 0;
+  border-bottom: 1px solid #EAEDF2;
+}
+.dem-tab {
+  background: none; border: none; cursor: pointer;
+  padding: 8px 14px; font-size: 13px; font-weight: 500;
+  color: #6B7280; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; border-radius: 6px 6px 0 0;
+  transition: color .15s, border-color .15s;
+}
+.dem-tab:hover { color: #4F46E5; }
+.dem-tab--active { color: #4F46E5; border-bottom-color: #4F46E5; }
+
+/* Scrollable form body */
+.dem-form { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+.dem-section {
+  padding: 16px 20px; overflow-y: auto; flex: 1;
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+/* Fields */
+.dem-field { display: flex; flex-direction: column; gap: 5px; }
+.dem-field--grow { flex: 1; min-width: 0; }
+.dem-field--icon { width: 72px; flex-shrink: 0; }
+
+.dem-row { display: flex; gap: 12px; }
+
+.dem-label { font-size: 12px; font-weight: 600; color: #374151; }
+.dem-required { color: #EF4444; }
+.dem-hint { font-size: 11px; color: #9AA7B4; }
+.dem-hint-inline { font-weight: 400; color: #9AA7B4; }
+
+.dem-input, .dem-textarea, .dem-select {
+  border: 1.5px solid #E5E7EB; border-radius: 7px;
+  padding: 7px 10px; font-size: 13px; color: #1E1B3C;
+  font-family: inherit; background: #FAFAFA;
+  transition: border-color .15s, box-shadow .15s;
+  width: 100%; box-sizing: border-box;
+}
+.dem-input:focus, .dem-textarea:focus, .dem-select:focus {
+  outline: none; border-color: #6366F1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, .12);
+  background: #fff;
+}
+.dem-textarea { resize: vertical; min-height: 72px; }
+.dem-select { cursor: pointer; }
+
+/* Commands */
+.dem-cmd-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.dem-input--cmd { flex: 1; min-width: 0; }
+.dem-cmd-arrow { color: #9AA7B4; font-size: 14px; flex-shrink: 0; }
+.dem-cmd-remove {
+  background: none; border: none; cursor: pointer;
+  color: #9AA7B4; font-size: 13px; padding: 4px 6px;
+  border-radius: 5px; flex-shrink: 0;
+  transition: background .15s, color .15s;
+}
+.dem-cmd-remove:hover { background: #FEE2E2; color: #DC2626; }
+
+.dem-add-cmd {
+  background: none; border: 1.5px dashed #D1D5DB;
+  border-radius: 6px; padding: 6px 12px;
+  font-size: 12px; color: #6B7280; cursor: pointer;
+  width: 100%; text-align: center; margin-top: 4px;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.dem-add-cmd:hover { border-color: #6366F1; color: #4F46E5; background: #F5F3FF; }
+
+/* Footer */
+.dem-footer {
+  display: flex; align-items: center;
+  padding: 14px 20px;
+  border-top: 1px solid #EAEDF2;
+  gap: 8px;
+}
+.dem-footer-right { display: flex; gap: 8px; margin-left: auto; }
+
+.dem-confirm-row { display: flex; align-items: center; gap: 8px; }
+.dem-confirm-msg { font-size: 12px; color: #DC2626; font-weight: 500; }
+
+/* Buttons */
+.dem-btn {
+  padding: 8px 16px; border-radius: 7px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1.5px solid transparent; transition: all .15s;
+}
+.dem-btn--primary {
+  background: #4F46E5; color: #fff; border-color: #4F46E5;
+}
+.dem-btn--primary:hover { background: #4338CA; border-color: #4338CA; }
+.dem-btn--ghost {
+  background: none; color: #374151; border-color: #E5E7EB;
+}
+.dem-btn--ghost:hover { background: #F9FAFB; }
+.dem-btn--danger {
+  background: #DC2626; color: #fff; border-color: #DC2626;
+}
+.dem-btn--danger:hover { background: #B91C1C; }
+.dem-btn--danger-ghost {
+  background: none; color: #DC2626; border-color: transparent;
+  margin-right: auto;
+}
+.dem-btn--danger-ghost:hover { background: #FEF2F2; }
