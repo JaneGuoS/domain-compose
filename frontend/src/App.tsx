@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ServiceData, ImpactResult } from './types';
+import { ServiceData, ImpactResult, Domain } from './types';
 import DomainGrid from './components/DomainGrid';
 import WorkflowPanel from './components/WorkflowPanel';
 import ImpactBar from './components/ImpactBar';
 import IntegrationPanel from './components/IntegrationPanel';
 import AnalyzePanel from './components/AnalyzePanel';
+import DomainEditModal from './components/DomainEditModal';
 import './App.css';
 
 export default function App() {
@@ -15,6 +16,10 @@ export default function App() {
   const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
   const [loading, setLoading]             = useState(true);
   const [showAnalyze, setShowAnalyze]     = useState(false);
+
+  // Edit modal state
+  const [editDomain, setEditDomain]       = useState<Domain | null>(null);
+  const [isNewDomain, setIsNewDomain]     = useState(false);
 
   // Fetch service list
   const refreshServices = useCallback(async () => {
@@ -59,6 +64,38 @@ export default function App() {
     const list = await refreshServices();
     const target = list.includes(service) ? service : list[0];
     if (target) loadService(target);
+  };
+
+  // ── Domain edit handlers ──────────────────────────────────────────────────
+
+  const handleSaveDomain = async (patch: Partial<Domain> & { id: string }) => {
+    if (!activeService) return;
+    const url = isNewDomain
+      ? `/api/services/${activeService}/domains`
+      : `/api/services/${activeService}/domains/${patch.id}`;
+    const method = isNewDomain ? 'POST' : 'PATCH';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setData(updated);
+    }
+    setEditDomain(null);
+  };
+
+  const handleDeleteDomain = async (domainId: string) => {
+    if (!activeService) return;
+    const res = await fetch(`/api/services/${activeService}/domains/${domainId}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setData(updated);
+    }
+    setEditDomain(null);
   };
 
   const counts = impact && data ? {
@@ -128,6 +165,8 @@ export default function App() {
               impact={impact}
               selectedWorkflow={selectedWorkflow}
               workflows={data.workflows}
+              onEditDomain={d => { setEditDomain(d); setIsNewDomain(false); }}
+              onAddDomain={() => { setEditDomain(null); setIsNewDomain(true); }}
             />
           </section>
 
@@ -153,6 +192,17 @@ export default function App() {
         <AnalyzePanel
           onClose={() => setShowAnalyze(false)}
           onDone={handleAnalyzeDone}
+        />
+      )}
+
+      {/* Domain edit / add modal */}
+      {(editDomain || isNewDomain) && (
+        <DomainEditModal
+          domain={editDomain}
+          isNew={isNewDomain}
+          onSave={handleSaveDomain}
+          onDelete={isNewDomain ? undefined : handleDeleteDomain}
+          onClose={() => { setEditDomain(null); setIsNewDomain(false); }}
         />
       )}
     </div>

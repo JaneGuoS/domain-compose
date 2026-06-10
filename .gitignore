@@ -13,6 +13,11 @@ build/
 .env.local
 .env.*.local
 
+# SQLite edits database (local-only, not committed)
+backend/data/edits.db
+backend/data/edits.db-shm
+backend/data/edits.db-wal
+
 # Logs
 logs/
 *.log
