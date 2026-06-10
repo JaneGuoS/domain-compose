@@ -1,331 +1,931 @@
 {
   "service": "content-manager-service",
-  "analyzedAt": "2026-06-05",
+  "analyzedAt": "2026-06-09",
+  "boundedContext": {
+    "owns": [
+      "Library content items (files, folders, versions)",
+      "Publishing profiles and publish mappings",
+      "Custom property definitions and values",
+      "Content permissions",
+      "Content expiration lifecycle",
+      "Annotations and comments",
+      "Activity / audit trail",
+      "External sync configuration",
+      "Team site membership"
+    ],
+    "dependsOn": [
+      "User Management Service (UMS)",
+      "Media Services (rendition, page storage)",
+      "Profile Service API",
+      "Notification Service",
+      "File Management Service (FMS)",
+      "LaunchDarkly (feature flags)",
+      "Cracking Pipeline Service"
+    ],
+    "publishes": [
+      "eventbus.public.content-manager-service.content-event",
+      "eventbus.public.content-manager-service.library-content-references.v4",
+      "eventbus.public.content-manager-service.data-collection",
+      "eventbus.public.search.ingest",
+      "eventbus.private.content-manager-service.expiration-notification-setting"
+    ],
+    "consumes": [
+      "eventbus.public.content-manager-service.content-event",
+      "eventbus.public.cms.custom-property",
+      "eventbus.private.content-manager-service.expiration-notification-setting",
+      "eventbus.public.ccp.meta",
+      "eventbus.scp.content-function-services.vfs.processed",
+      "eventbus.public.blob-virus-scan.scan-result",
+      "eventbus.public.content-foundation.static-augmentation"
+    ]
+  },
+  "gapAnalysis": [
+    {
+      "id": 1,
+      "title": "Anemic domain model — FileEntity/ItemModel has zero behavior",
+      "detail": "ItemModel is a 90+ property data bag with public setters and no methods. All business rules that should live on the aggregate (checkout guard, delete guard, rename uniqueness, folder-type guard) are implemented as static methods in FileWriter.cs and FileCheckpoint.cs. State mutations such as setting checkout status or soft-deleting are performed directly on the DTO by the writer layer with no invariant protection.",
+      "file": "ItemModel.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 2,
+      "title": "Business logic in application layer — ActivationWriter enforces domain invariants",
+      "detail": "ActivationWriter.ActivateContents contains multi-line domain rules: it checks item.VersionActivationStage == ContentVersionStatus.Published to throw ActivateActivatedVersionException, verifies variant uniqueness via LINQ GroupBy, and enforces the primary-version-must-exist rule. These are domain invariants that must be enforced inside ContentVersionEntity aggregate methods.",
+      "file": "ActivationWriter.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 3,
+      "title": "Static writer/reader classes bypass DI — untestable and uninjectable",
+      "detail": "FileWriter, ActivationWriter, RenameItemCommon, FolderWriter and 15+ other writer classes are static. Controllers call them directly (FileWriter.AddFile(), FileWriter.DeleteFile()). Context and orchestrators are created via OrchestratorFactory and new ScopedExpressContext() inside the static methods. This makes business logic untestable in isolation and impossible to mock, and means DI-registered services cannot be substituted.",
+      "file": "FileWriter.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 4,
+      "title": "Domain repositories contain raw SQL — infrastructure leaks into domain layer",
+      "detail": "FileRepository, ItemRepository, FolderRepository, and 27 other repositories extend SQLDataRepository and embed raw T-SQL strings with SqlParameter arrays. The repositories are located in the domain project (LibraryService.Domain) but are tightly coupled to SQL Server. There is no query abstraction; changing persistence requires touching domain-layer files.",
+      "file": "FileRepository.cs",
+      "severity": "P0",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 5,
+      "title": "Checkpoint classes externally enforce invariants that belong on aggregates",
+      "detail": "30+ *Checkpoint.cs classes in Express.Orchestrator/Checkpoint/ validate preconditions and throw exceptions before reaching any domain object. E.g. FileCheckpoint throws FileNotFoundException, FolderCheckpoint throws NoPermissionException. These are domain invariants; they should be enforced by aggregate methods, not by separate static validation classes upstream.",
+      "file": "FileCheckpoint.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 6,
+      "title": "ContentEventConsumer uses fire-and-forget Task.Factory.StartNew with no await",
+      "detail": "ContentEventConsumer.ConsumeEvent spawns a LongRunning Task via Task.Factory.StartNew with _ = discarding the task handle. Exceptions inside RunConsumeAsync are caught only at the inner retry loop; an uncaught exception silently kills the consumer. Additionally Kafka offset is committed unconditionally (subscriber.Value.Commit called outside the tenant-match branch), meaning events for other tenants are silently dropped but their offsets advance.",
+      "file": "ContentEventConsumer.cs",
+      "severity": "P0",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 7,
+      "title": "Invariants enforced outside aggregates",
+      "detail": "All domain invariant checks (file writable, file locked, file belongs to team site, version expirable) live in SystemStateExecutor and FileWriter rather than inside aggregate methods on FileEntity or FileVersionEntity. This means the rules can be bypassed by calling the repository directly.",
+      "file": "SystemStateExecutor.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 8,
+      "title": "Business logic in Express Writer layer",
+      "detail": "FileWriter, PublishWriter, and ActivationWriter contain branching business logic (publishability checks, checkout ownership, custom property validation) that belongs in domain aggregate methods. These classes act as a de-facto domain layer without the encapsulation guarantees.",
+      "file": "FileWriter.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 9,
+      "title": "State transitions set externally on entities",
+      "detail": "Workflow status (SUBMITTED, REJECTED, PROMOTED) and system state flags are set directly on model properties from application-layer code (e.g. item.WorkflowStatus = STATUS_SUBMITTED) rather than through protected aggregate command methods that enforce valid transitions.",
+      "file": "WorkflowRequestProxy.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 10,
+      "title": "Service Locator anti-pattern",
+      "detail": "ServiceCollectionHelper.GetSingletonService<T> and GetScopedService<T> are used throughout FileWriter and OrchestratorFactory to resolve dependencies at runtime, creating hidden coupling and making unit testing impossible without the full DI container.",
+      "file": "FileWriter.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 11,
+      "title": "OrchestratorFactory hides 30+ implementations",
+      "detail": "OrchestratorFactory creates orchestrators for 30+ operation types behind a single factory method. Actual dependencies (repositories, providers, Kafka clients) are invisible at the composition root, making static analysis and testing extremely difficult.",
+      "file": "OrchestratorFactory.cs",
+      "severity": "P0",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 12,
+      "title": "Service locator used throughout instead of constructor injection",
+      "detail": "ServiceCollectionHelper.GetSingletonService<T>() is called 1,482 times across the codebase (SearchProducer.cs, ContentEventConsumer.cs, and hundreds of Reader/Writer classes). This is a well-known anti-pattern that defeats IoC, makes unit testing impossible, and hides dependencies. Every class resolves its own dependencies at runtime rather than declaring them via constructor parameters.",
+      "file": "ServiceCollectionHelper.cs (called from ~200 classes)",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 13,
+      "title": "Static Reader/Writer classes replace application services and domain objects",
+      "detail": "70+ Reader and Writer classes (FileWriter, FolderWriter, PublishWriter, ActivationWriter, PermissionWriter, ExtensiveFileWriter, SBPProfileWriter, etc.) are used as static-style facades called directly from controllers (e.g. FileController.cs calls FileWriter.AddFile(), FileReader.ReadUnifiedContents()). These classes contain thousands of lines of mixed business logic, validation, persistence calls, and Kafka publishing. There is no application service layer or domain model layer — all behavior lives in these Reader/Writer monoliths.",
+      "file": "ExtensiveFileWriter.cs, PublishWriter.cs, ActivationWriter.cs, SBPProfileWriter.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 14,
+      "title": "Domain entity status mutated directly outside aggregate",
+      "detail": "Content item status is mutated directly on model objects in Writer classes rather than through aggregate command methods. Examples: ExternalSyncWriter.cs line 204 (itemVersion.Status = STATUS_UPLOAD_VIDEO_FOUNDATION_PROCESS_STREAM), line 211 (itemVersion.Status = isOfficeDocOrMedia ? ... : STATUS_READY), FileVersionWriter.cs line 1570 (newArticleVersion.Status = ItemStatus.STATUS_READY), SBPProfileWriter.cs lines 1423-1537 (repeated status checks and mutations). No invariant protection around state transitions.",
+      "file": "ExternalSyncWriter.cs, FileVersionWriter.cs, SBPProfileWriter.cs, ActivationWriter.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 15,
+      "title": "Validation scattered across 40+ Checkpoint classes instead of aggregate invariants",
+      "detail": "Business validation rules are encoded in 40+ procedural Checkpoint classes in the Orchestrator project (FileCheckpoint, FilePublishableCheckpoint, FileDeletableCheckpoint, ActivateCheckpoint, PromoteCheckpoint, FolderDeletableCheckpoint, ItemNameTooLongCheckpoint, etc.). These checkpoints execute guard logic that belongs inside aggregate command methods. The result is that business rules can be bypassed by calling Writer methods without running the associated checkpoints.",
+      "file": "Seismic.ContentManager.Express.Orchestrator/Checkpoint/*.cs (40 files)",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 16,
+      "title": "Two incompatible exception hierarchies with no typed DomainExceptionType",
+      "detail": "The codebase has two distinct exception bases: ContentManagerException in ControlCenter.Core.Exceptions.Common (with ContentManagerExceptionCategory enum: Unknown/NotFound/InvalidParamter/NoPermission/ServiceUnavaliable/WorkflowDisabled) and ContentManagerException in LibraryService.Abstractions.Exceptions. Neither maps cleanly to HTTP status codes through a single DomainExceptionType enum. 150+ specific exception classes exist but are thrown from all layers including domain, infrastructure, and even controllers.",
+      "file": "ContentManagerException.cs, ContentManagerExceptionCategory.cs (two separate namespaces)",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 17,
+      "title": "Controllers bypass application service layer and call Reader/Writer directly",
+      "detail": "Controllers across all API versions (V1.0, V1.1, V2.0, Unified, Orbit, APIM, Dark) resolve business operations by directly instantiating or calling static-style Reader/Writer classes. Example: FileController (V1.0) calls FileVersionReader.ReadLatestVersion() and FileWriter.AddFile() with no intervening application service. FileController (Unified) calls FileReader.ReadUnifiedContents() and ExtensiveFileWriter.AddContent(). This means controllers contain implicit orchestration logic.",
+      "file": "Seismic.ContentManagerService.Web/Controllers/**/*Controller.cs (85+ files)",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 18,
+      "title": "Domain project contains infrastructure concerns",
+      "detail": "The Domain project houses infrastructure classes: NodeRepository (SQL queries), GoogleDriveRepository, ExternalSyncRepository, UserSettingRepository, SearchProducer (Kafka publisher), CacheRemoverClient (HTTP calls), ExternalSyncService (orchestration), MicroAppRepository. None of these belong in a domain project — they are infrastructure adapters. The real domain has no home.",
+      "file": "Seismic.ContentManager.Domain/NodeRepository.cs, GoogleDriveRepository.cs, SearchProducer.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 19,
+      "title": "Static Writer/Reader classes replace injectable Application Services",
+      "detail": "Business logic lives in ~45 static classes (FileWriter, PublishWriter, FolderWriter, ContentViewReader, etc.) inside Seismic.ContentManager.Express. These classes create their own context via `new ScopedExpressContext()` inline and resolve dependencies via ServiceCollectionHelper service locator. They cannot be unit tested, mocked, or decorated. Every 'application service' method is a static entry point rather than a proper injectable IFileAppService/IPublishAppService.",
+      "file": "FileWriter.cs, PublishWriter.cs, FolderWriter.cs, ContentViewReader.cs (and ~43 others)",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 20,
+      "title": "Service Locator anti-pattern via ServiceCollectionHelper",
+      "detail": "ServiceCollectionHelper.GetSingletonService<T>() and GetScopedService<T>() are called in ContentViewReader (~15 calls), ContentEventConsumer, FileWriter, and other static Express classes. This hides dependencies, makes constructor injection impossible, and breaks testability. The ILogger, ISeismicCacheProvider, IToggle, IFMSClientManager, and IMapperService are all resolved at call time rather than at construction time.",
+      "file": "ContentViewReader.cs, ContentEventConsumer.cs, ContentIdsAccessPolicy.cs",
+      "severity": "P0",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 21,
+      "title": "Anemic domain model — no aggregate roots with invariant methods",
+      "detail": "FileManager, ItemManager are single-method thin delegators to repositories. FileVersionManager has no version state-transition methods. No entity class enforces business rules. All invariants (file cannot be published if checked out, version minorVersion != 0 blocks publish, name uniqueness) live in Checkpoint classes or Writer static methods rather than on aggregate root methods. ContentObjectStatus is a string-constants class rather than a typed enum or value object with valid-transition enforcement.",
+      "file": "FileManager.cs, ItemManager.cs, FileVersionManager.cs, ContentObjectStatus.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 22,
+      "title": "Business invariants enforced in Orchestrator Checkpoint layer instead of domain",
+      "detail": "Seismic.ContentManager.Express.Orchestrator contains 40+ Checkpoint classes (FilePublishableCheckpoint, FolderOperableCheckpoint, PromoteCheckpoint, RenameCheckpoint, etc.) that enforce domain invariants — existence checks, permission gates, state pre-conditions — by throwing typed exceptions. These rules belong as guard methods on aggregate roots (e.g. FileEntity.Publish(), FolderEntity.Rename()). Moving them into the domain makes invariants co-located with state and testable without the full orchestrator stack.",
+      "file": "FilePublishableCheckpoint.cs, FolderOperableCheckpoint.cs, PromoteCheckpoint.cs, RenameCheckpoint.cs, FileCheckpoint.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 23,
+      "title": "Anemic FileEntity — state transitions live outside the aggregate",
+      "detail": "FileManager.cs delegates entirely to FileRepository with no invariant-enforcing methods. Checkout/undo-checkout transitions (IsCheckedOut, CheckedOutBy), soft-delete guards, and permission enforcement are all mutated directly from FileWriter and the Orchestrator RequestEditFileCheckpoint lambda. entity.Checkout() and entity.UndoCheckout() methods do not exist; any caller that bypasses the orchestrator silently bypasses all invariants.",
+      "file": "FileManager.cs / FileRepository.cs / FileWriter.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 24,
+      "title": "All domain invariants encoded as Orchestrator Func factories, not aggregate preconditions",
+      "detail": "IContentOrchestrator.RequestEditFileCheckpoint() returns a Func<> that performs permission checks, quota validation, parent-folder existence, and content-state guards. This means the complete domain rule set is encoded as application-layer factory lambdas. Any Writer or background service that creates its own ScopedExpressContext can call the underlying repository directly without going through any invariant gate.",
+      "file": "SQLContentOrchestrator.cs / IContentOrchestrator.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 25,
+      "title": "PublishExecutor contains domain logic for publish-state transitions",
+      "detail": "PublishExecutor.PublishFile() updates Profile state, validates publishability, and writes audit records across multiple direct repository calls with no transactional aggregate boundary. These are domain operations that should be expressed as PublishMappingEntity.Publish(actorId, profileId, folderLocations). The entity does not exist; the concept is fully procedural.",
+      "file": "PublishExecutor.cs / PublishWriter.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 26,
+      "title": "ExpirationJobExecutor owns the file-version expiration lifecycle",
+      "detail": "ExpirationJobExecutor.Run() directly queries expired versions, marks them expired, removes publish mappings, and logs activity — all imperative steps that belong inside FileVersionEntity.Expire(). The domain invariant that a version must be removed from all publish profiles before being marked expired is encoded only in the executor's execution order, invisible to anyone loading a FileVersionEntity.",
+      "file": "ExpirationJobExecutor.cs / ExpirationBackgroundService.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 27,
+      "title": "Controller couples directly to Writer classes without interface injection",
+      "detail": "FileController calls FileWriter.ReadLatestVersion() and FileWriter.AddFile() with no IFileWriter interface injected. The controller has a direct compile-time or runtime coupling to the concrete Writer class, making it impossible to unit-test the controller in isolation and violating the dependency-inversion principle throughout the Controller → Writer layer.",
+      "file": "FileController.cs / FileWriter.cs / FolderController.cs / PublishController.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 28,
+      "title": "No DomainException base class — 280+ raw exception types with no unified HTTP mapping",
+      "detail": "All domain exceptions (FileNotFoundException, NoPermissionException, ActivateActivatedVersionException, etc.) extend System.Exception or application-specific bases with no shared DomainException<DomainExceptionType> contract. HTTP status code mapping is scattered across exception handlers. Adding a new exception requires updating multiple middleware layers. There is no DomainExceptionType enum to centralise code-to-HTTP mapping.",
+      "file": "Exceptions/ (280+ files)",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 29,
+      "title": "OrchestratorFactory static factory bypasses DI — 40+ orchestrators uninjectable",
+      "detail": "OrchestratorFactory.Create*Orchestrator() methods construct orchestrators by resolving services via ServiceCollectionHelper.GetSingletonService() (a service locator). This means orchestrators depend on ambient static state, cannot be substituted in tests, and their dependency graph is invisible to the DI container. 40+ orchestrator interfaces are registered in DI but never actually injected — they are retrieved via the factory.",
+      "file": "OrchestratorFactory.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 30,
+      "title": "No value objects — status, tenant identity, and compound keys represented as raw primitives",
+      "detail": "Content status is a raw string (item.Status = \"published\"), tenant identity is a raw string (teamSiteId), and compound version identity (contentId + versionId + variantId) is passed as separate string parameters everywhere. There are no immutable value objects with validation rules or equality semantics. This allows invalid states (e.g. empty status string, mismatched tenant) to propagate silently through the domain.",
+      "file": "ItemModel.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 31,
+      "title": "ScopedExpressContext created with 'new' inside writers — ambient tenant context not injected",
+      "detail": "Every static writer method creates context via new ScopedExpressContext() or new WorkerExpressContext(tenantInfo, userId). This pulls current tenant/user from ambient thread state rather than from a well-defined IExpressContext injected through the request pipeline. Multi-tenancy correctness depends on thread-local state being set correctly upstream, which is fragile and invisible in tests.",
+      "file": "ActivationWriter.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 32,
+      "title": "Domain events not raised by aggregates — side effects triggered imperatively in writers",
+      "detail": "After state changes (file deleted, content activated, content expired) the writers imperatively call observer/producer classes (LibraryContentReferencesObserver.Notify(), SearchProducer.Publish(), DataCollectionObserver.Notify()). There is no domain event raised from an aggregate method that the application service then dispatches. Side effect ordering and completeness depend on each writer remembering to call the right observers.",
+      "file": "FileWriter.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 33,
+      "title": "ExpirationJobExecutor and processor classes contain domain expiry rules",
+      "detail": "ContentExpireProcessor and ContentExpireNotifyProcessor determine expiry thresholds and notification timing using SQL queries and inline logic rather than through a domain object method. The rule 'notify N days before expiration' is a domain invariant that should live on ContentExpirationEntity, not in a background job executor.",
+      "file": "ExpirationJobExecutor.cs",
+      "severity": "P1",
+      "category": "Anemic model"
+    },
+    {
+      "id": 34,
+      "title": "ScopedExpressContext couples domain to HTTP",
+      "detail": "ScopedExpressContext holds a reference to the HTTP HttpContext as well as user identity, tenant info, permissions, and feature toggle state. Domain operations that accept this context are tightly coupled to ASP.NET Core middleware, preventing reuse in background services and tests.",
+      "file": "ScopedExpressContext.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 35,
+      "title": "ExpirationJobExecutor accesses warehouse SQL directly",
+      "detail": "ExpirationJobExecutor calls into the Warehouse SQL layer directly with raw Dapper queries to find and expire versions, bypassing the domain aggregate and repository interfaces defined in the abstraction layer.",
+      "file": "ExpirationJobExecutor.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 36,
+      "title": "No aggregate root boundary on content graph",
+      "detail": "File, FileVersion, FileVariant, FileAnnotation, and CustomPropertyValues are accessed independently through separate repositories. There is no aggregate root that controls the transactional boundary, allowing partial updates that can leave the content graph in inconsistent state.",
+      "file": "FileRepository.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 37,
+      "title": "Custom property validation in wrong layer",
+      "detail": "CustomPropertyInvalidCheck and PropertyValueCalculatorUtils.BatchCalculatePropertyValues() are invoked from FileWriter (application layer) rather than from within the CustomPropertyEntity or a CustomPropertyDomainService, leaking domain validation into the orchestration layer.",
+      "file": "FileWriter.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 38,
+      "title": "Raw exceptions not mapped through DomainExceptionType",
+      "detail": "Several classes throw raw framework exceptions (InvalidOperationException, ArgumentException, generic Exception) instead of typed ContentManagerException subclasses, causing HTTP status code decisions to be made inconsistently at the controller and middleware level.",
+      "file": "PublishWriter.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 39,
+      "title": "Multiple API version controllers duplicating logic",
+      "detail": "V1.0, V1.1, V2.0, V3.0 plus Dark/Orbit/APIM variants create 80+ controller classes with overlapping endpoint implementations. Cross-version logic differences are managed with if-branches and conditional DI rather than versioned application services.",
+      "file": "FileController.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 40,
+      "title": "Kafka event listeners contain domain logic instead of delegating to domain services",
+      "detail": "ContentEventConsumer, CustomPropertyEventListener, VFSEventListener, CrackingPipelineMetaEventListener, and AugmentationEventListener handle Kafka events using ServiceCollectionHelper.GetSingletonService<T>() and contain inline domain logic. They do not delegate to domain services or command handlers. VFSEventListener directly transitions file version status on video-processed events.",
+      "file": "Seismic.ContentManager.EventBus.Listener/ContentEventConsumer.cs, VFSEventListener.cs, CustomPropertyEventListener.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 41,
+      "title": "Missing value objects — status, type, and identity fields are raw primitives",
+      "detail": "Content status values are compared as raw string literals and integer constants (e.g. 'if (item.Status == ContentObjectStatus.STATUS_GOOGLEDRIVE_PLACE_HOLDER)' scattered across 10+ Writer files). ContentType, Language, TenantId, TeamSiteId, and ContentId are all raw strings or GUIDs with no encapsulating value object enforcing validity. ContentObjectStatus is used as an enum but its transitions are not protected by a state machine.",
+      "file": "ActivationWriter.cs, SBPProfileWriter.cs, ExternalSyncWriter.cs, ExtensiveFileWriter.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 42,
+      "title": "Common.Model project is a 500+ file shared DTO dumping ground",
+      "detail": "Common.Model contains 523+ files with all DTOs, request/response models, and shared constants mixed together with no domain separation. This creates implicit coupling across all bounded contexts — any model change risks breaking unrelated domains. There is no separation between domain model objects and API view models.",
+      "file": "Common.Model/ (523 files)",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 43,
+      "title": "PropertyMessageController is a 432-line orchestration class in the controller layer",
+      "detail": "PropertyMessageController performs complex nested-loop orchestration, maintains intermediate state, and executes multi-step batch custom property processing directly in controller action methods. This is orchestration that belongs in an application service or domain service.",
+      "file": "Seismic.ContentManagerService.Web/Controllers/PropertyMessageController.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 44,
+      "title": "No domain events raised on state transitions — search indexing is a direct call",
+      "detail": "SearchProducer.ProduceAsync() is called directly from Writer classes without a domain event intermediary. When a file is published or activated, the Writer directly calls SearchProducer rather than raising a domain event (ContentPublished, ContentActivated) that a handler forwards to search. This couples business operations to infrastructure concerns and makes it impossible to add additional side effects without modifying Writer classes.",
+      "file": "SearchProducer.cs (called directly from multiple Writer classes)",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 45,
+      "title": "Seismic.ContentManager.Express.Orchestrator is a mixed-layer project",
+      "detail": "The Orchestrator project mixes: Checkpoint validation classes (domain invariant logic), Orchestrator interfaces for HTTP clients (infrastructure), Cart and context-passing classes (application layer), and SQL orchestrators (infrastructure queries). It is a catch-all that prevents proper layer separation.",
+      "file": "Seismic.ContentManager.Express.Orchestrator/ (165 files)",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 46,
+      "title": "ExternalSyncService and ContentSyncManager coordinate sync without a domain abstraction",
+      "detail": "ExternalSyncService.cs and ContentSyncManager.cs (in the Domain project) orchestrate multi-step external sync workflows procedurally. ContentSyncManager.cs line 282 catches ContentManagerException inline and branches business flow on exception type rather than on explicit domain state. This is infrastructure logic disguised as domain logic.",
+      "file": "Seismic.ContentManager.Domain/ContentSync/ContentSyncManager.cs, ExternalSyncService.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 47,
+      "title": "Domain project (LibraryService.Domain) contains HTTP client implementations",
+      "detail": "RenditionHttpClient, PageStorageClient, DiscEventV2Client, GoogleDriveManager+AuthClient all live inside Seismic.ContentManagerService.LibraryService.Domain. A domain project must not contain HTTP clients or external-system coupling. These should live in an Infrastructure project with interfaces defined in the domain contracts.",
+      "file": "RenditionHttpClient.cs, PageStorageClient.cs, DiscEventV2Client.cs, GoogleDriveManager.cs, AuthClient.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 48,
+      "title": "ContentEventConsumer uses static fields and service locator instead of BackgroundService DI",
+      "detail": "ContentEventConsumer is a static class with static Lazy<> Kafka subscriber fields and static ILogger resolved via ServiceCollectionHelper. It lacks BackgroundService lifecycle management. Other listeners (CustomPropertyEventListener, VFSEventListener) follow a slightly better pattern but still use static subscriber dictionaries. All Kafka consumers should implement BackgroundService with constructor-injected IAvroClientFactory, IServiceScopeFactory, and ILogger.",
+      "file": "ContentEventConsumer.cs, CrackingPipelineMetaEventListener.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 49,
+      "title": "Kafka publish embedded in Observer pattern inside Express — not domain events",
+      "detail": "EventBusObserver, SearchMeshObserver, WebhookEventObserver, LibraryContentReferencesObserver, DataCollectionObserver all live in Seismic.ContentManager.Express/Notification. They are called from within Writers via a notification chain. The domain events they represent (ContentPublished, ContentDeleted, ContentUpdated) are not first-class domain event objects — they are constructed inline with raw data mapping inside the observer, making it impossible to test domain event semantics independently.",
+      "file": "EventBusObserver.cs, SearchMeshObserver.cs, WebhookEventObserver.cs, LibraryContentReferencesObserver.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 50,
+      "title": "OrchestratorFactory uses static factory methods creating deep object graphs",
+      "detail": "OrchestratorFactory.CreateTeamSiteOrchestrator(context), CreatePublishOrchestrator(context), etc. are static factory methods used inside every Writer. These factories create new orchestrator instances per call, bypassing DI lifetime management and making it impossible to swap implementations for testing without modifying static code.",
+      "file": "OrchestratorFactory.cs (Seismic.ContentManager.Express.Orchestrator)",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 51,
+      "title": "Cart pattern couples domain query path to mutable HTTP-request-scoped state",
+      "detail": "Cart.Cart is a request-scoped cache created in every Writer and threaded through all Orchestrators. Domain repositories short-circuit to the Cart before hitting SQL. This couples the domain read path to a mutable object tied to a single HTTP request, making aggregate loading non-deterministic and Cart invalidation bugs silently serve stale state to callers in the same request.",
+      "file": "Cart/Cart.cs / FileWriter.cs / SQLContentOrchestrator.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 52,
+      "title": "ActivityRepository.LogActivity called imperatively across 12+ layers",
+      "detail": "Audit logging is an afterthought side-effect performed by direct repository calls from Executors, Orchestrators, Writers, and background services. There is no DomainEvent mechanism; adding a new content operation requires remembering to call LogActivity in the correct place. Omitting it silently produces an incomplete audit trail with no compile-time guard.",
+      "file": "ActivityRepository.cs — called from ExpirationJobExecutor, PublishExecutor, SQLContentOrchestrator, FileWriter, and 8+ other classes",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 53,
+      "title": "No domain events raised from entities; Kafka publishing is ad-hoc imperative",
+      "detail": "ContentEvent is published to Kafka via direct calls to DiscEventV2Client from PublishExecutor and background services. No aggregate raises a domain event; there is no DomainEvent base class, no domain event dispatcher, and no EventSender abstraction in the domain layer. Downstream Kafka consumers have no formal contract tied to aggregate lifecycle state changes.",
+      "file": "PublishExecutor.cs / ExpirationJobExecutor.cs / ContentEventConsumer.cs / TopicConstants.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 54,
+      "title": "45+ bespoke exception classes instead of a DomainExceptionType enum pattern",
+      "detail": "The service has 45+ custom exception classes (FileNotFoundException, NoPermissionException, ContentDeleteException, CheckoutException, etc.) all extending ContentManagerException directly without a typed enum. ExceptionMiddleware maps class types to HTTP codes. Adding new exception semantics requires two changes (new class + new middleware mapping), and there is no single place to audit all domain error states.",
+      "file": "Seismic.ContentManagerService.LibraryService.Core/Exceptions/*.cs / ExceptionMiddleware.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 55,
+      "title": "SQLDataRepository base exposes raw SqlDataReader to all repositories",
+      "detail": "SQLDataRepository.ExecuteSqlReader() returns a raw SqlDataReader iterated manually in every repository. This binds all domain repositories to SQL Server connection semantics, makes repositories impossible to test without a live database, and leaks infrastructure-specific exception types (SqlException) into domain call stacks.",
+      "file": "SQLDataRepository.cs — base class for FileRepository, FolderRepository, ProfileRepository, CustomPropertyRepository, and 10+ others",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 56,
+      "title": "DomainActionProvider polymorphism for content types lives in the Express layer",
+      "detail": "IDomainActionProvider / StandardDomainActionProvider / JourneyActionProvider / LessonActionProvider implement different behaviors per ObjectTypeId in an Express-layer DomainActionDispatcher. This content-type polymorphism belongs in the domain as a strategy on the ContentEntity aggregate, not as infrastructure-layer if/switch dispatch in the application orchestration module.",
+      "file": "DomainActionDispatcher.cs / IDomainActionProvider.cs / JourneyActionProvider.cs / LessonActionProvider.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 57,
+      "title": "Kafka consumer group ID uses non-production naming convention",
+      "detail": "ContentEventConsumer creates a consumer group with GroupId = cms-test-consumer-{topic}. The 'test' infix in a production consumer group ID risks conflicting with actual test consumers and makes observability tooling harder to distinguish environments.",
+      "file": "ContentEventConsumer.cs",
+      "severity": "P2",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 58,
+      "title": "RLPolling background service uses Thread.Sleep instead of async delay",
+      "detail": "ExpirationBackgroundService calls Thread.Sleep(sleepMillis) inside an async ExecuteAsync method, blocking the thread pool thread for the sleep duration. Should use await Task.Delay() to release the thread during idle periods.",
+      "file": "ExpirationBackgroundService.cs",
+      "severity": "P2",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 59,
+      "title": "Orchestrator layer duplicates permission checking already done in controllers",
+      "detail": "Multiple orchestrators re-validate permissions (tenant access, user role) that are already enforced by the [Authorize] attribute and policy middleware on the controller. This creates divergence risk: a permission change must be applied in two places.",
+      "file": "Express.Orchestrator/Orchestrator/",
+      "severity": "P2",
+      "category": "Layer violation"
+    },
+    {
+      "id": 60,
+      "title": "WorkflowRequestProxy is a pure HTTP passthrough",
+      "detail": "WorkflowRequestProxy contains zero domain logic — it is a typed HTTP client masquerading as a domain service. Local workflow status is not enforced: the service cannot protect against invalid status transitions when the external workflow service is unavailable.",
+      "file": "WorkflowRequestProxy.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 61,
+      "title": "No domain events raised internally",
+      "detail": "The service publishes Kafka events after persistence but raises no in-process domain events. This means cross-domain reactions (e.g. expiration triggers permission cleanup) must be handled by the application layer, creating temporal coupling and making side-effect chains hard to trace.",
+      "file": "ContentEventConsumer.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 62,
+      "title": "Batch operations allow partial failure silently",
+      "detail": "BatchUpdateFileCustomProperties catches per-item exceptions and continues, returning a mixed success/failure result without any rollback of prior successful items. There is no compensating transaction or saga to restore consistency on partial failure.",
+      "file": "CustomPropertyManager.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 63,
+      "title": "Tenant context passed as parameter, not encapsulated",
+      "detail": "tenantId and teamSiteId are passed as explicit parameters through every method call stack rather than being encapsulated in a TenantContext value object resolved once at the request boundary. This causes widespread coupling to multi-tenancy infrastructure in domain methods.",
+      "file": "FileManager.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 64,
+      "title": "RenditionReader sets Rendition status directly on view model during read",
+      "detail": "RenditionReader.cs lines 178, 204, 212, 216 set skimmer.Status = RENDITION_STATUS.READY/PROCESSING/NOTEXIST directly inside a read operation while mapping data. Status derivation logic for rendition availability belongs in a RenditionEntity or domain service, not in a reader/mapping class.",
+      "file": "Seismic.ContentManager.Express/Reader/RenditionReader.cs",
+      "severity": "P2",
+      "category": "Anemic model"
+    },
+    {
+      "id": 65,
+      "title": "Tabeeb.Business.Domain and Tabeeb.Business.Common are orphaned external domain fragments",
+      "detail": "Two projects (Tabeeb.Business.Domain, Tabeeb.Business.Common) exist as source code within the service repo but represent a different product domain (Tabeeb). These should either be extracted to their own service or clearly identified as a separate bounded context rather than being embedded in content-manager-service.",
+      "file": "Tabeeb.Business.Domain/, Tabeeb.Business.Common/",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 66,
+      "title": "ContentObjectStatus as untyped string constants with no state machine",
+      "detail": "ContentObjectStatus is a class holding string constants (STATUS_READY, STATUS_FAILED, STATUS_UPLOAD_POST_UPLOAD_PROCESSING, etc.) with a raw string Status property. There is no enforcement of valid transitions, no exhaustive enum for compile-time safety, and status comparisons use raw string equality throughout the codebase. This should be a proper enum or sealed class with allowed-transition logic.",
+      "file": "ContentObjectStatus.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 67,
+      "title": "Exception types are ad-hoc custom classes not mapped through a DomainExceptionType enum",
+      "detail": "The codebase has 20+ ad-hoc exception classes (FileNotFoundException, NoPermissionException, DuplicateNameException, SchedulePublishTaskNotFoundException, etc.) each inheriting from ContentManagerException or NuPitchRequestException. There is no central DomainExceptionType enum to map to HTTP status codes, making error-handling middleware complex and HTTP status decisions scattered. A unified exception pattern would allow a single ExceptionFilter to handle all domain exceptions.",
+      "file": "ContentManagerException.cs, FileNotFoundException.cs, NoPermissionException.cs, DuplicateNameException.cs (and 15+ others in LibraryService.Abstractions/Exceptions/)",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 68,
+      "title": "Cart pattern in Orchestrator accumulates context without explicit aggregate identity",
+      "detail": "The Cart class (Seismic.ContentManager.Express.Orchestrator/Cart/Cart.cs) is passed through every Checkpoint chain and Writer to accumulate validated data (file, user, folder). This is a mutable bag-of-objects pattern that obscures which aggregates are loaded and what state has been validated. It conflates the loaded domain objects with the validation context, making it hard to reason about what has been verified at any point in the flow.",
+      "file": "Cart.cs (Seismic.ContentManager.Express.Orchestrator/Cart/)",
+      "severity": "P2",
+      "category": "Layer violation"
+    },
+    {
+      "id": 69,
+      "title": "30+ Orchestrator interfaces fragment domain logic across the application layer",
+      "detail": "IContentOrchestrator, IFolderOrchestrator, IPermissionOrchestrator, IPublishOrchestrator, IUserOrchestrator, ITeamSiteOrchestrator, IProfileOrchestrator (30+ total) each hold fragments of domain logic. A single business operation such as AddFile requires creating and coordinating three Orchestrators — complexity that DDD resolves by having one aggregate enforce its own invariants with a single command method.",
+      "file": "Seismic.ContentManager.Express.Orchestrator/ — 30+ interface files",
+      "severity": "P2",
+      "category": "Layer violation"
+    },
+    {
+      "id": 70,
+      "title": "Warehouse layer duplicates repository abstractions already defined in LibraryService",
+      "detail": "Express.Warehouse defines IFile, IFolder, IPermission, IProfile warehouse interfaces that duplicate IFileRepository, IFolderRepository, IContentPermissionRepository, IProfileRepository in LibraryService.Abstractions. Two parallel repository abstraction layers add indirection without adding isolation; changes to persistence contracts must be made in two places.",
+      "file": "Seismic.ContentManager.Express.Warehouse/ vs Seismic.ContentManagerService.LibraryService.Abstractions/",
+      "severity": "P2",
+      "category": "Layer violation"
+    },
+    {
+      "id": 71,
+      "title": "LaunchDarkly feature-toggle concerns wired directly into controllers via filter attributes",
+      "detail": "Controllers use [DeprecatedByToggleFilter(FEATURE_STATEBASEDPUBLISHING)] attributes that invoke the LaunchDarkly SDK at the controller level. Feature flags are an infrastructure concern and should be resolved in an application service or middleware, not declared as routing attributes on controller actions.",
+      "file": "PublishController.cs / FeatureToggleService.cs / DeprecatedByToggleFilter.cs",
+      "severity": "P2",
+      "category": "Infra coupling"
+    }
+  ],
   "domains": [
     {
-      "id": "content-item",
-      "name": "Content Item",
-      "icon": "\ud83d\udcc4",
+      "id": "file",
+      "name": "File",
+      "icon": "📄",
       "health": "anemic",
       "operations": [
-        "Upload",
-        "Rename",
-        "Move",
-        "Delete",
-        "Checkout",
-        "Checkin",
-        "Batch edit"
+        "GetFile",
+        "AddFile",
+        "UpdateFile",
+        "PatchUpdateFile",
+        "DeleteFile",
+        "CheckoutFile",
+        "UndoCheckoutFile",
+        "BulkUpdate"
       ],
       "keywords": [
-        "file",
-        "upload",
-        "content",
-        "checkout",
-        "rename",
-        "folder",
-        "item"
+        "ContentObject",
+        "FileWriter",
+        "FileReader",
+        "FileManager",
+        "FileRepository",
+        "ItemModel",
+        "IsCheckedOut",
+        "CheckedOutBy",
+        "ObjectTypeId"
       ],
       "dddTarget": {
-        "aggregate": "ContentItemEntity",
-        "identity": "ContentObjectId + TeamSiteId",
+        "aggregate": "FileEntity",
+        "identity": "Id (NVarChar — ContentObject.Id)",
         "lifecycle": [
-          "uploading",
-          "active",
+          "draft",
+          "processing",
+          "ready",
           "expired",
           "deleted"
         ],
         "valueObjects": [
-          "ContentStatus",
-          "TeamSiteId",
-          "WorkflowStatus"
+          "FileStatus",
+          "CheckoutState",
+          "ContentObjectType",
+          "TenantId"
         ],
         "childEntities": [
-          "FolderEntity"
+          "FileVersionEntity"
         ],
         "invariants": [
-          "Cannot activate unless status is READY or UPLOAD_COMPLETE",
-          "Cannot delete while a workflow approval is pending",
-          "Cannot checkout if already checked out by another user"
+          "A File cannot be checked out if it is already checked out by another user",
+          "A File cannot be deleted while checked out",
+          "A File cannot be renamed to a name that already exists in the same folder",
+          "A File cannot be activated if it is already in Published status",
+          "A File cannot be checked out if it is a folder type"
         ],
         "commands": [
           {
-            "cmd": "Upload(userId, request)",
-            "event": "ContentUploaded"
+            "cmd": "Create(actorId, NewFileModel)",
+            "event": "FileCreated"
           },
           {
-            "cmd": "Activate(userId)",
-            "event": "ContentActivated"
+            "cmd": "Checkout(actorId)",
+            "event": "FileCheckedOut"
           },
           {
-            "cmd": "ScheduleActivation(userId, at)",
-            "event": "ActivationScheduled"
+            "cmd": "UndoCheckout(actorId)",
+            "event": "FileCheckoutUndone"
           },
           {
-            "cmd": "Expire(reason)",
-            "event": "ContentExpired"
+            "cmd": "Update(actorId, FileUpdateModel)",
+            "event": "FileUpdated"
           },
           {
-            "cmd": "Checkout(userId)",
-            "event": "ContentCheckedOut"
-          },
-          {
-            "cmd": "Delete(userId)",
-            "event": "ContentDeleted"
+            "cmd": "Delete(actorId)",
+            "event": "FileDeleted"
           }
         ]
       }
     },
     {
-      "id": "version",
-      "name": "Version",
-      "icon": "\ud83d\udd16",
+      "id": "file",
+      "name": "FileVersion",
+      "icon": "⏱",
       "health": "anemic",
       "operations": [
-        "Create version",
-        "Promote",
-        "Expire version",
-        "Track status"
+        "GetFileVersion",
+        "GetAllFileVersions",
+        "MarkExpired",
+        "DeleteVersion"
       ],
       "keywords": [
-        "version",
-        "promote",
-        "versioning",
-        "major",
-        "minor"
+        "ContentObjectAllVersions",
+        "ContentObjectExpire",
+        "FileVersionManager",
+        "FileVersionRepository",
+        "ExpirationJobExecutor",
+        "ContentVersionStatus"
       ],
       "dddTarget": {
-        "aggregate": "ContentVersionEntity",
-        "identity": "versionId",
+        "aggregate": "FileVersionEntity",
+        "identity": "VersionId (ContentObjectAllVersions.VersionId)",
         "lifecycle": [
-          "uploading",
+          "draft",
           "processing",
           "ready",
-          "promoted",
-          "expired"
+          "expired",
+          "deleted"
         ],
         "valueObjects": [
-          "VersionStatus",
-          "RenditionInfo"
+          "FileStatus",
+          "CheckoutState",
+          "ContentObjectType",
+          "TenantId"
         ],
-        "childEntities": [
-          "RenditionEntity"
-        ],
+        "childEntities": [],
         "invariants": [
-          "Status transitions forward-only: uploading \u2192 processing \u2192 ready",
-          "Cannot promote a version whose status is not READY",
-          "Cannot create a new version while checkout is active"
+          "A File cannot be checked out if it is already checked out by another user",
+          "A File cannot be deleted while checked out",
+          "A File cannot be renamed to a name that already exists in the same folder",
+          "A File cannot be activated if it is already in Published status",
+          "A File cannot be checked out if it is a folder type"
         ],
         "commands": [
           {
-            "cmd": "BeginUpload(isVideo, isOfficeDoc)",
-            "event": "VersionUploadStarted"
+            "cmd": "Checkout(userId, teamSiteId)",
+            "event": "FileCheckedOut"
           },
           {
-            "cmd": "MarkRenditionProcessed(info)",
-            "event": "VersionProcessed"
+            "cmd": "Unchecked(userId)",
+            "event": "FileUnchecked"
           },
           {
-            "cmd": "Promote(userId)",
-            "event": "VersionPromoted"
+            "cmd": "Delete(userId, teamSiteId)",
+            "event": "FileDeleted"
+          },
+          {
+            "cmd": "Rename(userId, newName, teamSiteId)",
+            "event": "FileRenamed"
           },
           {
             "cmd": "Expire()",
-            "event": "VersionExpired"
+            "event": "FileExpired"
           }
         ]
       }
     },
     {
-      "id": "activation",
-      "name": "Activation & Publish",
-      "icon": "\ud83d\ude80",
-      "health": "partial",
-      "operations": [
-        "Direct activate",
-        "Schedule activation",
-        "Publish",
-        "Approval gate"
-      ],
-      "keywords": [
-        "activate",
-        "publish",
-        "schedule",
-        "approval",
-        "sbp",
-        "profile"
-      ],
-      "dddTarget": {
-        "aggregate": "Coordinated by ActivationDomainService",
-        "identity": "N/A \u2014 cross-aggregate",
-        "lifecycle": [
-          "none"
-        ],
-        "valueObjects": [],
-        "childEntities": [],
-        "invariants": [
-          "Can only activate if version is READY and actor has ACTIVATE permission"
-        ],
-        "commands": [
-          {
-            "cmd": "Activate(userId, contentId)",
-            "event": "ContentActivated"
-          },
-          {
-            "cmd": "Publish(userId, contentId)",
-            "event": "ContentPublished"
-          }
-        ]
-      }
-    },
-    {
-      "id": "external-sync",
-      "name": "External Sync",
-      "icon": "\ud83d\udd04",
+      "id": "folder",
+      "name": "Folder",
+      "icon": "📁",
       "health": "anemic",
       "operations": [
-        "Google Drive sync",
-        "Cloud content",
-        "Sync tracking",
-        "MicroApp"
+        "GetFolder",
+        "AddFolder",
+        "AddFolderPath",
+        "DeleteFolder",
+        "GetFolderByName",
+        "GetFolderPathIdsByNamePath"
       ],
       "keywords": [
-        "sync",
-        "google",
-        "drive",
-        "cloud",
-        "external",
-        "tiled"
+        "ContentObject (ObjectTypeId=folder)",
+        "FolderWriter",
+        "FolderReader",
+        "FolderRepository",
+        "LibraryMaterializedPath",
+        "ParentId",
+        "LibraryParentId"
       ],
       "dddTarget": {
-        "aggregate": "ExternalSyncEntity",
-        "identity": "syncConfigId",
+        "aggregate": "FolderEntity",
+        "identity": "Id (ContentObject.Id where ObjectTypeId=FOLDER)",
         "lifecycle": [
-          "idle",
-          "running",
-          "completed",
-          "failed"
+          "active",
+          "deleted"
         ],
         "valueObjects": [
-          "SyncState",
-          "SyncSource"
+          "FolderPermission",
+          "ContentObjectType",
+          "TenantId"
         ],
         "childEntities": [],
         "invariants": [
-          "Cannot Start() if state is already Running",
-          "Cannot Complete() if state is not Running",
-          "Cannot Fail() if state is already Completed"
+          "A folder name must be unique within its parent folder",
+          "A root folder cannot be renamed or deleted",
+          "An external-sync subfolder cannot be renamed independently"
         ],
         "commands": [
           {
-            "cmd": "Configure(userId, config)",
-            "event": "SyncConfigured"
+            "cmd": "AddFolder(teamSiteId, parentFolderId, name)",
+            "event": "FolderCreated"
           },
           {
-            "cmd": "Start(userId)",
-            "event": "SyncStarted"
+            "cmd": "RenameFolder(teamSiteId, folderId, newName)",
+            "event": "FolderRenamed"
           },
           {
-            "cmd": "Complete(result)",
-            "event": "SyncCompleted"
+            "cmd": "MoveFolder(teamSiteId, folderId, targetFolderId)",
+            "event": "FolderMoved"
           },
           {
-            "cmd": "Fail(reason)",
-            "event": "SyncFailed"
+            "cmd": "DeleteFolder(teamSiteId, folderId)",
+            "event": "FolderDeleted"
           }
         ]
       }
     },
     {
-      "id": "expiration",
-      "name": "Expiration",
-      "icon": "\u23f1",
-      "health": "partial",
+      "id": "publish",
+      "name": "Publish",
+      "icon": "🚀",
+      "health": "anemic",
       "operations": [
-        "Set expiration",
-        "Background runner",
-        "Expiration notifications"
+        "PublishFile",
+        "UnpublishFile",
+        "GetPublishStatus",
+        "GetAllPendingPublishedFileInfos",
+        "SchedulePublish",
+        "GetPendingPublishedFileInfos"
       ],
       "keywords": [
-        "expire",
-        "expiration",
-        "schedule",
-        "notification",
-        "date"
+        "Profile",
+        "ProfileVersion",
+        "PublishWriter",
+        "PublishReader",
+        "PublishOrchestrator",
+        "PublishRepository",
+        "PublishExecutor",
+        "FilePublishStatusServiceModel",
+        "FEATURE_STATEBASEDPUBLISHING"
       ],
       "dddTarget": {
-        "aggregate": "ExpirationPolicyEntity",
-        "identity": "contentId",
+        "aggregate": "PublishMappingEntity",
+        "identity": "(FileVersionId, ProfileId)",
         "lifecycle": [
-          "unset",
           "scheduled",
-          "triggered",
+          "executing",
+          "completed",
+          "failed",
           "cancelled"
         ],
         "valueObjects": [
-          "ExpirationDate"
+          "PublishStatus",
+          "FolderLocationMap",
+          "ScheduledPublishTime"
         ],
         "childEntities": [],
         "invariants": [
-          "ExpirationDate cannot be in the past",
-          "Cannot schedule expiration while a workflow approval is pending"
+          "Content type must be publishable (not all content types support publishing)",
+          "File must not be checked out by another user before scheduling publish",
+          "Version must exist and belong to the file",
+          "A scheduled publish task cannot be deleted if version MinorVersion != 0 (draft)",
+          "Only one active schedule publish task per version"
         ],
         "commands": [
           {
-            "cmd": "Schedule(userId, expiresAt)",
-            "event": "ExpirationScheduled"
+            "cmd": "Publish(actorId, profileId, folderLocations)",
+            "event": "FilePublished"
           },
           {
-            "cmd": "Cancel(userId)",
-            "event": "ExpirationCancelled"
+            "cmd": "Unpublish(actorId, profileId)",
+            "event": "FileUnpublished"
           },
           {
-            "cmd": "Trigger()",
-            "event": "ContentExpired"
+            "cmd": "SchedulePublish(actorId, profileId, scheduledAt)",
+            "event": "FilePublishScheduled"
           }
         ]
       }
     },
     {
-      "id": "custom-properties",
-      "name": "Custom Properties",
-      "icon": "\ud83c\udff7",
-      "health": "good",
+      "id": "custom-property",
+      "name": "CustomProperty",
+      "icon": "🏷",
+      "health": "partial",
       "operations": [
-        "Define properties",
-        "Assign to content",
-        "Background sync",
-        "Publish to Kafka"
+        "GetCustomPropertyDefinitions",
+        "GetCustomPropertyValues",
+        "UpdateCustomPropertyValues",
+        "ValidateCustomPropertyValues",
+        "GetDomainOfValues"
       ],
       "keywords": [
-        "property",
-        "metadata",
-        "tag",
-        "custom",
-        "attribute"
+        "CustomPropertyDefinition",
+        "ContentCustomProperty",
+        "CustomPropertyManager",
+        "CustomPropertyRepository",
+        "CustomPropertyXmlResolver",
+        "CustomPropertyDefinitionResolver",
+        "DomainOfValueModel"
       ],
       "dddTarget": {
-        "aggregate": "CustomPropertySetEntity",
-        "identity": "contentId",
+        "aggregate": "CustomPropertyEntity",
+        "identity": "DefinitionId (CustomPropertyDefinition.Id)",
         "lifecycle": [
-          "none"
+          "pending",
+          "applied",
+          "error"
         ],
         "valueObjects": [
-          "CustomPropertyValue",
-          "PropertyDefinitionRef"
+          "CustomPropertyType",
+          "DomainOfValue",
+          "CustomPropertySchema"
         ],
-        "childEntities": [],
+        "childEntities": [
+          "CustomPropertyValueEntity"
+        ],
         "invariants": [
-          "Values must conform to their property definition type",
-          "Required properties cannot be cleared"
+          "A required custom property must be set before content can be published",
+          "A custom property value must conform to its definition's domain of values if constrained",
+          "Custom property field count per tenant cannot exceed the defined limit"
         ],
         "commands": [
           {
-            "cmd": "Apply(values)",
-            "event": "CustomPropertiesChanged"
+            "cmd": "UpdateValues(actorId, contentId, values)",
+            "event": "CustomPropertyUpdated"
           },
           {
-            "cmd": "BulkSetAITags(contentId, tags)",
-            "event": "AITagsApplied"
+            "cmd": "Deprecate(actorId)",
+            "event": "CustomPropertyDeprecated"
           }
         ]
       }
@@ -333,286 +933,985 @@
     {
       "id": "permission",
       "name": "Permission",
-      "icon": "\ud83d\udd10",
-      "health": "anemic",
+      "icon": "🔐",
+      "health": "partial",
       "operations": [
-        "Granular permissions",
-        "Unique permissions",
-        "TeamSite membership"
+        "GetContentPermissions",
+        "GetUniquePermissions",
+        "CheckPermission",
+        "GrantPermission",
+        "RevokePermission"
       ],
       "keywords": [
-        "permission",
-        "access",
-        "security",
-        "auth",
-        "role",
-        "teamsite"
+        "ContentPermission",
+        "ContentObjectPermission",
+        "ContentPermissionManager",
+        "ContentPermissionRepository",
+        "NoPermissionException",
+        "NoTeamsitePermissionException",
+        "TooManyFilesToGetUniquePermissionException"
       ],
       "dddTarget": {
-        "aggregate": "PermissionEntity",
-        "identity": "contentId + principalId",
+        "aggregate": "ContentPermissionEntity",
+        "identity": "(ContentId, SubjectId)",
         "lifecycle": [
-          "none"
+          "granted",
+          "revoked"
         ],
         "valueObjects": [
-          "AccessLevel",
-          "PrincipalId"
+          "PermissionRole",
+          "MemberGroupId",
+          "AccessLevel"
         ],
         "childEntities": [],
         "invariants": [
-          "Cannot grant OWNER and VIEWER simultaneously",
-          "Unique permissions cannot apply to inherited items",
-          "Cannot revoke the last OWNER of a TeamSite"
+          "Only owners can set unique permissions",
+          "Unique permissions cannot be set on more files than the tenant limit allows",
+          "A member group must exist before being assigned a role"
         ],
         "commands": [
           {
-            "cmd": "Grant(grantor, principal, level)",
-            "event": "PermissionGranted"
+            "cmd": "SetUniquePermission(teamSiteId, actorId, contentId, request)",
+            "event": "UniquePermissionChanged"
           },
           {
-            "cmd": "Revoke(revoker, principalId)",
-            "event": "PermissionRevoked"
+            "cmd": "RemoveUniquePermission(teamSiteId, actorId, contentId)",
+            "event": "UniquePermissionChanged"
           },
           {
-            "cmd": "SetUnique(adminId)",
-            "event": "PermissionSetUnique"
+            "cmd": "UpdateGranularPermissions(teamSiteId, actorId, contentId, grants)",
+            "event": "None"
           }
         ]
       }
     },
     {
-      "id": "collaboration",
-      "name": "Collaboration",
-      "icon": "\ud83e\udd1d",
-      "health": "good",
+      "id": "external-sync",
+      "name": "ExternalSync",
+      "icon": "🔄",
+      "health": "anemic",
       "operations": [
-        "Annotations",
-        "Workflow approval",
-        "LiveDoc",
-        "Share",
-        "Barcode"
+        "SyncContent",
+        "GetSyncStatus",
+        "EnableSync",
+        "DisableSync",
+        "HandleSyncCallback",
+        "UpdateSyncIndicator"
       ],
       "keywords": [
-        "comment",
-        "annotation",
-        "review",
-        "workflow",
-        "share",
-        "collaborate"
+        "ExternalSyncSetting",
+        "ExternalSyncManager",
+        "GoogleDriveService",
+        "ExternalContentSynchronizationTaskV2Manager",
+        "SyncConfigId",
+        "SyncIndicatorBGService",
+        "ExternalSyncBadRequestException",
+        "ExternalSyncInvalidCredentialException"
       ],
       "dddTarget": {
-        "aggregate": "Delegated to CMS \u2014 no local aggregate needed",
-        "identity": "N/A",
+        "aggregate": "ExternalSyncEntity",
+        "identity": "SyncConfigId (ExternalSyncSetting.SyncConfigId)",
         "lifecycle": [
-          "none"
+          "pending",
+          "authorized",
+          "active",
+          "syncing",
+          "error",
+          "disconnected"
         ],
         "valueObjects": [
-          "WorkflowStatus"
+          "SyncProvider",
+          "SyncCredential",
+          "SyncStatus"
         ],
-        "childEntities": [],
+        "childEntities": [
+          "ExternalSyncTaskEntity"
+        ],
         "invariants": [
-          "WorkflowStatus on ContentItemEntity blocks deletion while SUBMITTED"
+          "A sync config must have a valid external folder ID",
+          "A sub-synchronized item (leaf) cannot be renamed or moved independently",
+          "External sync cannot be configured on a folder that already has unique permissions"
         ],
         "commands": [
           {
-            "cmd": "SubmitForReview(userId)",
+            "cmd": "Enable(actorId, credential)",
+            "event": "ExternalSyncEnabled"
+          },
+          {
+            "cmd": "Disable(actorId)",
+            "event": "ExternalSyncDisabled"
+          },
+          {
+            "cmd": "StartSync(taskId)",
+            "event": "ExternalSyncStarted"
+          },
+          {
+            "cmd": "CompleteSync(taskId, result)",
+            "event": "ExternalSyncCompleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "activity",
+      "name": "Activity",
+      "icon": "⚙️",
+      "health": "anemic",
+      "operations": [
+        "LogActivity",
+        "GetActivityStream",
+        "GetContentActivity"
+      ],
+      "keywords": [
+        "Activity",
+        "ActivityStream",
+        "ActivityRepository",
+        "ActivityReader",
+        "ActivityType",
+        "AuditTrail"
+      ],
+      "dddTarget": {
+        "aggregate": "ActivityEntity",
+        "identity": "ActivityId",
+        "lifecycle": [
+          "recorded"
+        ],
+        "valueObjects": [
+          "ActivityType",
+          "ActivityPayload"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Activity records are immutable once written"
+        ],
+        "commands": [
+          {
+            "cmd": "Record(actorId, contentId, type, payload)",
+            "event": "ActivityRecorded"
+          }
+        ]
+      }
+    },
+    {
+      "id": "comment",
+      "name": "Comment",
+      "icon": "🤝",
+      "health": "anemic",
+      "operations": [
+        "GetComments",
+        "AddComment",
+        "DeleteComment",
+        "GetAnnotations",
+        "AddAnnotation"
+      ],
+      "keywords": [
+        "Comment",
+        "Annotation",
+        "CommentReader",
+        "CommentRepository",
+        "AnnotationRepository",
+        "AskExpert",
+        "ExpertReader"
+      ],
+      "dddTarget": {
+        "aggregate": "CommentEntity",
+        "identity": "CommentId",
+        "lifecycle": [
+          "active",
+          "deleted"
+        ],
+        "valueObjects": [
+          "CommentBody"
+        ],
+        "childEntities": [
+          "AnnotationEntity"
+        ],
+        "invariants": [
+          "A comment cannot be deleted by a user who is neither its author nor a site admin"
+        ],
+        "commands": [
+          {
+            "cmd": "Add(actorId, contentId, body)",
+            "event": "CommentAdded"
+          },
+          {
+            "cmd": "Delete(actorId)",
+            "event": "CommentDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "team-site",
+      "name": "TeamSite",
+      "icon": "👤",
+      "health": "partial",
+      "operations": [
+        "GetTeamSite",
+        "AddMember",
+        "RemoveMember",
+        "GetMembers",
+        "UpdateSiteSettings"
+      ],
+      "keywords": [
+        "TeamSiteMember",
+        "TeamSiteMemberManager",
+        "TeamSiteMemberRepository",
+        "TeamSiteOrchestrator",
+        "BelongTeamSite",
+        "TeamSiteController"
+      ],
+      "dddTarget": {
+        "aggregate": "TeamSiteEntity",
+        "identity": "TeamSiteId",
+        "lifecycle": [
+          "active",
+          "archived",
+          "deleted"
+        ],
+        "valueObjects": [
+          "SiteQuota",
+          "SiteConfiguration"
+        ],
+        "childEntities": [
+          "TeamSiteMemberEntity"
+        ],
+        "invariants": [
+          "A team site must have at least one owner at all times",
+          "A member role must be either Owner or Member",
+          "A member group must exist in UMS before being assigned to a team site"
+        ],
+        "commands": [
+          {
+            "cmd": "CreateTeamSite(actorId, settings)",
+            "event": "TeamSiteCreated"
+          },
+          {
+            "cmd": "AddMember(teamSiteId, userId, role)",
+            "event": "MemberAdded"
+          },
+          {
+            "cmd": "DeleteTeamSite(teamSiteId)",
+            "event": "TeamSiteDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "profile",
+      "name": "Profile",
+      "icon": "👤",
+      "health": "partial",
+      "operations": [
+        "GetProfile",
+        "CreateProfile",
+        "UpdateProfile",
+        "DeleteProfile",
+        "AddContentToProfile",
+        "RemoveContentFromProfile",
+        "ScheduleAddToProfile"
+      ],
+      "keywords": [
+        "SBPProfileWriter",
+        "SBPProfileReader",
+        "ProfileRepository",
+        "ProfileAggregateProvider",
+        "ProfileDbProvider",
+        "ContentProfile",
+        "AddToProfileCheckpoint"
+      ],
+      "dddTarget": {
+        "aggregate": "ProfileEntity",
+        "identity": "profileVersionId (string UUID)",
+        "lifecycle": [
+          "draft",
+          "published",
+          "archived"
+        ],
+        "valueObjects": [
+          "ProfileVersion",
+          "ProfileContent"
+        ],
+        "childEntities": [
+          "ProfileItem"
+        ],
+        "invariants": [
+          "A folder cannot be added to a profile alongside its files",
+          "A profile cannot be published with placeholder content that is not yet synced",
+          "Scheduled add-to-profile requires content to be in a publishable state"
+        ],
+        "commands": [
+          {
+            "cmd": "AddContent(profileId, contentId)",
+            "event": "ContentAddedToProfile"
+          },
+          {
+            "cmd": "RemoveContent(profileId, contentId)",
+            "event": "ContentRemovedFromProfile"
+          },
+          {
+            "cmd": "PublishProfile(profileId)",
+            "event": "ProfilePublished"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "expiration",
+      "name": "Expiration",
+      "icon": "⏱",
+      "health": "partial",
+      "operations": [
+        "GetExpirationRule",
+        "SetExpirationRule",
+        "DeleteExpirationRule",
+        "ProcessExpirations",
+        "SendExpirationNotifications",
+        "ConsumeExpirationNotificationSetting"
+      ],
+      "keywords": [
+        "ExpirationWriter",
+        "ExpirationReader",
+        "ExpirationBackgroundService",
+        "ExpirationJobExecutor",
+        "ContentExpireProcessor",
+        "ContentExpireNotifyProcessor",
+        "MailManager",
+        "ContentExpirationRule",
+        "SaveExpirationCommon"
+      ],
+      "dddTarget": {
+        "aggregate": "ExpirationRuleEntity",
+        "identity": "contentId + tenantId",
+        "lifecycle": [
+          "none",
+          "scheduled",
+          "expiring",
+          "expired"
+        ],
+        "valueObjects": [
+          "ExpirationDate",
+          "ExpirationRule",
+          "DeliveryExpirationMode"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Expiration can only be set on published versions (MinorVersion = 0)",
+          "Expiration date must be in the future",
+          "Expiration date must comply with tenant-configured minimum/maximum expiration window for the file type",
+          "Draft versions (MinorVersion > 0) cannot expire"
+        ],
+        "commands": [
+          {
+            "cmd": "SetExpiration(userId, expirationDate)",
+            "event": "ExpirationDateSet"
+          },
+          {
+            "cmd": "Cancel(userId)",
+            "event": "ExpirationCancelled"
+          },
+          {
+            "cmd": "Expire()",
+            "event": "ContentExpired"
+          },
+          {
+            "cmd": "NotifyExpiringSoon()",
+            "event": "ContentExpiringSoonNotified"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "live-insights",
+      "name": "ContentView",
+      "icon": "🔍",
+      "health": "anemic",
+      "operations": [
+        "GetContentView",
+        "CreateContentView",
+        "UpdateContentView",
+        "DeleteContentView",
+        "GetContentViewItems",
+        "ListViewItems",
+        "GetFolderContents"
+      ],
+      "keywords": [
+        "ContentViewReader",
+        "ContentViewWriter",
+        "ContentViewController",
+        "ContentViewRepository",
+        "ServiceCollectionHelper",
+        "ContentViewsLimitException",
+        "ListViewItemReader"
+      ],
+      "dddTarget": {
+        "aggregate": "ContentViewEntity",
+        "identity": "contentViewId + tenantId",
+        "lifecycle": [
+          "draft",
+          "active",
+          "deleted"
+        ],
+        "valueObjects": [
+          "ContentFilter",
+          "SortConfiguration",
+          "DisplayFields"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "View queries must not exceed the maximum date range window",
+          "Content view count must not exceed the configured tenant view limit",
+          "Click events must reference a valid existing folder or file"
+        ],
+        "commands": [
+          {
+            "cmd": "CreateContentView(actorId, definition)",
+            "event": "ContentViewCreated"
+          },
+          {
+            "cmd": "UpdateContentView(viewId, definition)",
+            "event": "ContentViewUpdated"
+          },
+          {
+            "cmd": "DeleteContentView(viewId)",
+            "event": "ContentViewDeleted"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "annotation",
+      "name": "Annotation",
+      "icon": "🤝",
+      "health": "partial",
+      "operations": [
+        "GetAnnotations",
+        "AddAnnotation",
+        "UpdateAnnotation",
+        "DeleteAnnotation",
+        "GetWhiteboardAnnotations"
+      ],
+      "keywords": [
+        "AnnotationWriter",
+        "AnnotationReader",
+        "AnnotationController",
+        "PayloadResolverFactory",
+        "WhiteboardAnnotation",
+        "ContentAnnotation",
+        "AudioPayloadResolver"
+      ],
+      "dddTarget": {
+        "aggregate": "AnnotationEntity",
+        "identity": "annotationId + contentId",
+        "lifecycle": [
+          "active",
+          "deleted"
+        ],
+        "valueObjects": [
+          "AnnotationPayload",
+          "AnchorCoordinates",
+          "CommentThread"
+        ],
+        "childEntities": [
+          "AnnotationComment"
+        ],
+        "invariants": [
+          "An annotation must have a valid page/slide anchor",
+          "An audio annotation must have a valid audio blob reference"
+        ],
+        "commands": [
+          {
+            "cmd": "AddAnnotation(contentId, payload)",
+            "event": "AnnotationAdded"
+          },
+          {
+            "cmd": "DeleteAnnotation(annotationId)",
+            "event": "AnnotationDeleted"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "activation",
+      "name": "Activation",
+      "icon": "⚙️",
+      "health": "anemic",
+      "operations": [
+        "ActivateContent",
+        "DeactivateContent",
+        "BatchActivate",
+        "ScheduleActivate",
+        "VariantActivation",
+        "GetActivationStatus"
+      ],
+      "keywords": [
+        "Activate",
+        "Deactivate",
+        "ScheduleActivate",
+        "ContentObjectStatus",
+        "ActiveVersion"
+      ],
+      "dddTarget": {
+        "aggregate": "ActivationEntity",
+        "identity": "contentId, tenantId",
+        "lifecycle": [
+          "inactive",
+          "activating",
+          "active",
+          "deactivating",
+          "deactivated"
+        ],
+        "valueObjects": [
+          "ContentObjectStatus",
+          "ActivationSource"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "A placeholder content cannot be activated until the external file is synced",
+          "A content already in an active workflow cannot be deactivated",
+          "A previously deactivated shared minor version cannot be re-activated"
+        ],
+        "commands": [
+          {
+            "cmd": "ActivateContent(contentId, actorId)",
+            "event": "ContentActivated"
+          },
+          {
+            "cmd": "DeactivateContent(contentId, actorId)",
+            "event": "ContentDeactivated"
+          },
+          {
+            "cmd": "ScheduleActivation(contentId, scheduleDate)",
+            "event": "ActivationScheduled"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "workflow",
+      "name": "Workflow",
+      "icon": "⚙️",
+      "health": "partial",
+      "operations": [
+        "SubmitWorkflow",
+        "ApproveWorkflow",
+        "RecallWorkflow",
+        "RevokeWorkflow",
+        "ClaimWorkflow",
+        "UnclaimWorkflow",
+        "GetWorkflowStatus",
+        "CanSubmitWorkflow"
+      ],
+      "keywords": [
+        "Workflow",
+        "Submit",
+        "Approve",
+        "Recall",
+        "Claim",
+        "Unclaim",
+        "WorkflowStatus",
+        "MajorVersion"
+      ],
+      "dddTarget": {
+        "aggregate": "WorkflowEntity",
+        "identity": "workflowId, versionId, tenantId",
+        "lifecycle": [
+          "not_started",
+          "in_review",
+          "approved",
+          "recalled",
+          "revoked"
+        ],
+        "valueObjects": [
+          "WorkflowStatus",
+          "ApproverId",
+          "WorkflowStep"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "A workflow cannot be submitted on a minor version",
+          "A content cannot be activated while its workflow is in review",
+          "A workflow can only be recalled by the original submitter"
+        ],
+        "commands": [
+          {
+            "cmd": "SubmitForReview(versionId, actorId)",
             "event": "WorkflowSubmitted"
           },
           {
-            "cmd": "Approve(reviewerId)",
+            "cmd": "RecallWorkflow(workflowId, actorId)",
+            "event": "WorkflowRecalled"
+          },
+          {
+            "cmd": "ApproveWorkflow(workflowId, approverId)",
             "event": "WorkflowApproved"
           }
         ]
-      }
+      },
+      "_retainedFromPrevious": true
     },
     {
-      "id": "rendition",
-      "name": "Rendition & Media",
-      "icon": "\ud83c\udfac",
+      "id": "system-state",
+      "name": "SystemState",
+      "icon": "📦",
       "health": "partial",
       "operations": [
-        "Rendition tracking",
-        "Cracking pipeline",
-        "Virus scan",
-        "Augmentation"
+        "SetSystemState",
+        "ClearSystemState",
+        "GetSystemState",
+        "CheckFileReadable",
+        "CheckFileWritable",
+        "ProcessTimeouts"
       ],
       "keywords": [
-        "rendition",
-        "video",
-        "media",
-        "thumbnail",
-        "preview",
-        "cracking"
+        "SystemStateExecutor",
+        "SystemStateBackgroundService",
+        "SystemStateModel",
+        "StateType",
+        "TimeoutAction",
+        "WriteLocked",
+        "ReadLocked",
+        "Hidden"
       ],
       "dddTarget": {
-        "aggregate": "RenditionEntity (child of ContentVersionEntity)",
-        "identity": "renditionId",
+        "aggregate": "SystemStateEntity",
+        "identity": "ticketNumber (string) scoped to (teamSiteId, contentId)",
         "lifecycle": [
-          "processing",
-          "ready",
-          "failed"
+          "Active",
+          "TimedOut",
+          "Cleared"
         ],
         "valueObjects": [
-          "RenditionStatus"
+          "SystemStateType",
+          "TimeoutAction"
         ],
         "childEntities": [],
         "invariants": [
-          "Status: processing \u2192 ready | failed (no reversal)"
+          "Write-locked content cannot be written by anyone other than the lock holder",
+          "Read-locked content cannot be read except by privileged actors",
+          "Timed-out states must execute their TimeoutAction before clearing",
+          "Only one active write lock per content item at a time"
         ],
         "commands": [
           {
-            "cmd": "MarkReady(renditionInfo)",
-            "event": "RenditionReady"
+            "cmd": "AcquireWriteLock(teamSiteId, actorId, contentId, timeout, timeoutAction)",
+            "event": "None"
           },
           {
-            "cmd": "MarkFailed(reason)",
-            "event": "RenditionFailed"
+            "cmd": "ReleaseWriteLock(teamSiteId, actorId, ticketNumber)",
+            "event": "None"
+          },
+          {
+            "cmd": "ProcessTimeoutAction(ticketNumber)",
+            "event": "VersionSystemStateChange"
           }
         ]
-      }
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "content-activation",
+      "name": "Content Activation",
+      "icon": "⚙️",
+      "health": "anemic",
+      "operations": [
+        "ActivateContents",
+        "DeactivateContents",
+        "ScheduleActivate",
+        "CancelScheduledActivation",
+        "GetActivationStatus"
+      ],
+      "keywords": [
+        "ActivationWriter",
+        "ActivationReader",
+        "ActivationCheckpoint",
+        "ScheduleActivateJobExecutor",
+        "ContentVersionStatus",
+        "VersionActivationStage",
+        "IsPrimary",
+        "ActiveVersionId"
+      ],
+      "dddTarget": {
+        "aggregate": "ContentVersionEntity",
+        "identity": "(contentId, versionId, variantId)",
+        "lifecycle": [
+          "draft",
+          "scheduled",
+          "published",
+          "deactivated"
+        ],
+        "valueObjects": [
+          "ContentVersionStatus",
+          "VariantId",
+          "ActivationSchedule"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "A version cannot be activated if it is already in Published status",
+          "Cannot activate multiple versions of the same content variant simultaneously",
+          "Cannot activate secondary versions when the content has no activated primary version",
+          "A scheduled activation cannot be created if one already exists for this version"
+        ],
+        "commands": [
+          {
+            "cmd": "Activate(userId)",
+            "event": "ContentVersionActivated"
+          },
+          {
+            "cmd": "Deactivate(userId)",
+            "event": "ContentVersionDeactivated"
+          },
+          {
+            "cmd": "ScheduleActivation(userId, scheduledAt)",
+            "event": "ContentActivationScheduled"
+          },
+          {
+            "cmd": "CancelScheduledActivation(userId)",
+            "event": "ContentActivationScheduleCancelled"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
     }
   ],
   "workflows": [
     {
-      "id": "upload-activation",
-      "name": "Content Upload & Activation",
+      "id": "get-file",
+      "name": "Get File",
       "domains": [
-        "content-item",
-        "version",
-        "rendition",
-        "activation"
+        "permission",
+        "file"
       ],
       "steps": [
         {
-          "label": "POST /files (FileWriter.Upload)",
+          "label": "FileController.GetFile(teamSiteId, fileId)",
           "type": "api"
         },
         {
-          "label": "Create ContentObject (SQL)",
+          "label": "FileWriter.ReadLatestVersion()",
           "type": "domain"
         },
         {
-          "label": "Create Version record",
+          "label": "ScopedExpressContext + Cart.Cart() init",
           "type": "domain"
         },
         {
-          "label": "Kafka OUT: cracking-pipeline",
-          "type": "kafka"
-        },
-        {
-          "label": "CrackingPipelineListener \u2192 rendition",
-          "type": "background"
-        },
-        {
-          "label": "ActivationWriter (45 checkpoints)",
-          "type": "violation"
-        },
-        {
-          "label": "SBPProfileWriter.UpdateFileToProfile",
+          "label": "IContentOrchestrator.RequestFileCheckpoint(cart, CMOperationType.ViewFile) — permission check",
           "type": "domain"
         },
         {
-          "label": "Kafka OUT: content-event",
-          "type": "kafka"
-        }
-      ]
-    },
-    {
-      "id": "external-sync-flow",
-      "name": "External Sync (Google Drive)",
-      "domains": [
-        "external-sync",
-        "version",
-        "content-item"
-      ],
-      "steps": [
+          "label": "IContentOrchestrator.RequestGetContentItemFunc(cart)(teamSiteId, fileId)",
+          "type": "domain"
+        },
         {
-          "label": "External source (Google Drive)",
+          "label": "FileRepository.GetFile(fileId) — SELECT ContentObject WHERE Id=@id",
           "type": "external"
         },
         {
-          "label": "ExternalSyncWriter.SyncFile",
-          "type": "api"
-        },
-        {
-          "label": "ExternalSyncReader sets .State \u26a0",
-          "type": "violation"
-        },
-        {
-          "label": "SyncIndicatorBGService tracks",
-          "type": "background"
-        },
-        {
-          "label": "itemVersion.Status set in Writer \u26a0",
-          "type": "violation"
-        },
-        {
-          "label": "Kafka OUT: library-content-references",
-          "type": "kafka"
-        }
-      ]
-    },
-    {
-      "id": "expiration-flow",
-      "name": "Content Expiration",
-      "domains": [
-        "expiration",
-        "content-item"
-      ],
-      "steps": [
-        {
-          "label": "PUT expiration date (SQL)",
-          "type": "api"
-        },
-        {
-          "label": "Kafka IN: expiration-notification-setting",
-          "type": "kafka"
-        },
-        {
-          "label": "ExpirationBGService polls 20s",
-          "type": "background"
-        },
-        {
-          "label": "ExpirationWriter.ExpireContent",
+          "label": "Map ItemModel → ItemVersionServiceModel",
           "type": "domain"
         },
         {
-          "label": "Kafka OUT: content-event",
-          "type": "kafka"
+          "label": "200 OK",
+          "type": "api"
         }
       ]
     },
     {
-      "id": "publish-flow",
-      "name": "Publish / Approval Workflow",
+      "id": "add-file",
+      "name": "Add File",
       "domains": [
-        "activation",
         "permission",
-        "content-item"
+        "file",
+        "file-version",
+        "activity"
       ],
       "steps": [
         {
-          "label": "POST publish (PublishWriter)",
+          "label": "FileController.AddFile(teamSiteId, NewFileRequestModel)",
           "type": "api"
         },
         {
-          "label": "PublishGate permission check",
+          "label": "FileWriter.AddFile(teamSiteId, newFile.ToModel<NewFileModel>())",
           "type": "domain"
         },
         {
-          "label": "SQLPublishOrchestrator checkpoint chain",
+          "label": "IContentOrchestrator.RequestEditFileCheckpoint(cart, CMOperationType.AddFile) — quota + permission + parent folder check",
           "type": "domain"
         },
         {
-          "label": "FilePublishableCheckpoint validates",
+          "label": "IContentOrchestrator.RequestAddFileFunc(cart)(teamSiteId, newFile)",
           "type": "domain"
         },
         {
-          "label": "Status updated in Writer \u26a0",
+          "label": "FileRepository.InsertFile() — INSERT ContentObject",
+          "type": "external"
+        },
+        {
+          "label": "FileVersionRepository.InsertFileVersion() — INSERT ContentObjectAllVersions",
+          "type": "external"
+        },
+        {
+          "label": "PublishRepository.AddInitialPublishSetting()",
+          "type": "external"
+        },
+        {
+          "label": "ActivityRepository.LogActivity(ActivityType.Create)",
+          "type": "domain"
+        },
+        {
+          "label": "201 Created",
+          "type": "api"
+        }
+      ]
+    },
+    {
+      "id": "publish-file",
+      "name": "Publish File",
+      "domains": [
+        "permission",
+        "publish",
+        "activity"
+      ],
+      "steps": [
+        {
+          "label": "PublishController.PublishFile(teamSiteId, fileId, versionId, PublishFileRequestModel)",
+          "type": "api"
+        },
+        {
+          "label": "PublishWriter.PublishFile()",
+          "type": "domain"
+        },
+        {
+          "label": "IPublishOrchestrator.RequestPublishFileCheckpoint(cart, CMOperationType.PublishFile) — publishability + permission check",
+          "type": "domain"
+        },
+        {
+          "label": "ProfileRepository.GetProfile(profileId)",
+          "type": "external"
+        },
+        {
+          "label": "PublishRepository.UpdatePublishMapping(fileVersionId, profileId, folderLocations)",
+          "type": "external"
+        },
+        {
+          "label": "PublishExecutor.PublishFile() — update Profile state + log Activity",
           "type": "violation"
         },
         {
-          "label": "Kafka OUT: content-event",
+          "label": "DiscEventV2Client.Publish ContentEvent → eventbus.public.content-manager-service.content-event",
+          "type": "kafka"
+        },
+        {
+          "label": "200 OK with PublishResponseModel",
+          "type": "api"
+        }
+      ]
+    },
+    {
+      "id": "content-version-expiration",
+      "name": "Content Version Expiration (Background)",
+      "domains": [
+        "file-version",
+        "publish",
+        "activity"
+      ],
+      "steps": [
+        {
+          "label": "ExpirationBackgroundService.ExecuteAsync() — RLPolling loop per conversion database",
+          "type": "background"
+        },
+        {
+          "label": "ExpirationJobExecutor.Run(conversionDatabase)",
+          "type": "background"
+        },
+        {
+          "label": "FileVersionRepository.QueryExpiredVersions() — SELECT ContentObjectExpire WHERE ExpirationDate <= GETDATE()",
+          "type": "external"
+        },
+        {
+          "label": "FileVersionRepository.MarkAsExpired(versionId)",
+          "type": "external"
+        },
+        {
+          "label": "ActivityRepository.LogExpiration(versionId)",
+          "type": "domain"
+        },
+        {
+          "label": "PublishRepository.RemovePublishedVersion(versionId)",
+          "type": "external"
+        },
+        {
+          "label": "Publish ExpirationNotificationSetting → eventbus.private.content-manager-service.expiration-notification-setting",
+          "type": "kafka"
+        }
+      ]
+    },
+    {
+      "id": "consume-content-event",
+      "name": "Consume Content Event (Kafka)",
+      "domains": [
+        "file",
+        "activity"
+      ],
+      "steps": [
+        {
+          "label": "ContentEventConsumer.ConsumeEvent(tenant, stoppingToken)",
+          "type": "background"
+        },
+        {
+          "label": "IEventAvroSubscriber<ContentEvent>.ConsumeAsync() — subscribe to content-event topic",
+          "type": "kafka"
+        },
+        {
+          "label": "Filter by TenantName and ActionType (ChangeRating, FileUpdated, ...)",
+          "type": "domain"
+        },
+        {
+          "label": "CacheRemover — invalidate cached file entry",
+          "type": "domain"
+        },
+        {
+          "label": "SearchProducer.Publish() → eventbus.public.search.ingest",
+          "type": "kafka"
+        },
+        {
+          "label": "subscriber.Commit(consumeResult)",
+          "type": "kafka"
+        }
+      ]
+    },
+    {
+      "id": "update-custom-properties",
+      "name": "Update Custom Properties (async)",
+      "domains": [
+        "custom-property",
+        "file"
+      ],
+      "steps": [
+        {
+          "label": "CustomPropertiesController.UpdateCustomProperties()",
+          "type": "api"
+        },
+        {
+          "label": "CustomPropertyManager.ValidateAndQueue(contentId, values)",
+          "type": "domain"
+        },
+        {
+          "label": "CustomPropertyBackgroundService polls deferred queue",
+          "type": "background"
+        },
+        {
+          "label": "CustomPropertyRepository.UpdatePropertyValues()",
+          "type": "external"
+        },
+        {
+          "label": "Publish CustomPropertyEvent → eventbus.public.cms.custom-property",
           "type": "kafka"
         }
       ]
@@ -620,31 +1919,37 @@
   ],
   "integrations": {
     "kafkaIn": [
-      "cracking-pipeline-topic",
-      "blob-virus-scan.scan-result",
-      "static-augmentation",
-      "expiration-notification-setting"
+      "eventbus.public.content-manager-service.content-event",
+      "eventbus.public.cms.custom-property",
+      "eventbus.private.content-manager-service.expiration-notification-setting",
+      "eventbus.public.ccp.meta",
+      "eventbus.scp.content-function-services.vfs.processed",
+      "eventbus.public.blob-virus-scan.scan-result",
+      "eventbus.public.content-foundation.static-augmentation"
     ],
     "kafkaOut": [
-      "content-event-topic",
-      "cms.custom-property",
-      "library-content-references.v4",
-      "data-collection"
+      "eventbus.public.content-manager-service.content-event",
+      "eventbus.public.content-manager-service.library-content-references.v4",
+      "eventbus.public.content-manager-service.data-collection",
+      "eventbus.public.search.ingest",
+      "eventbus.private.content-manager-service.expiration-notification-setting"
     ],
     "http": [
-      "CMS",
-      "UMS",
-      "VFS",
-      "BlobStorage",
-      "CustomObject (COS)",
+      "UserManagementService",
+      "MediaServices",
+      "ProfileServiceAPI",
+      "NotificationService",
+      "FMSClient",
       "LaunchDarkly"
     ],
     "background": [
-      "ScheduleActivateBGService",
-      "ExpirationBGService",
-      "CustomPropertyBGService",
-      "CrackingPipelineListener",
-      "SyncIndicatorBGService"
+      "ExpirationBackgroundService",
+      "CustomPropertyBackgroundService",
+      "SystemStateBackgroundService",
+      "ScheduleActivateBackgroundService",
+      "ScheduleAddToProfileBackgroundService",
+      "SyncIndicatorBGService",
+      "ECMMigrationBackgroundService"
     ]
   }
 }

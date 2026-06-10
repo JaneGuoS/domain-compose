@@ -22,8 +22,130 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .vt-btn{padding:4px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:transparent;color:#9AA7B4}
 .vt-btn.active{background:#fff;color:#1E1B3C;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .vt-btn.refactor.active{background:#F15A24;color:#fff}
+.vt-btn.gap.active{background:#C62828;color:#fff}
+.gap-count{display:inline-block;background:#EF5350;color:#fff;border-radius:10px;font-size:9px;font-weight:800;padding:1px 5px;margin-left:4px;vertical-align:middle}
 
-.hdr-r{font-size:11px;color:#9AA7B4;flex-shrink:0}
+/* BOUNDED CONTEXT */
+.bc-panel{background:#fff;border:1.5px solid #D0DCF0;border-radius:10px;padding:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.bc-group h4{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#9AA7B4;margin-bottom:7px}
+.bc-group ul{list-style:none}
+.bc-group li{font-size:11px;color:#3D3D5C;padding:2px 0 2px 10px;position:relative;line-height:1.5}
+.bc-group li::before{content:'·';position:absolute;left:0;color:#C0C8D4;font-size:13px}
+
+/* AGGREGATE CARDS */
+.agg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.agg{background:#fff;border-radius:12px;border:1.5px solid #E5E5E5;overflow:hidden}
+.agg-hdr{padding:11px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.agg-identity{font-size:10px;font-weight:400;margin-left:auto;opacity:.65;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.agg-body{padding:14px;display:flex;flex-direction:column;gap:10px}
+.agg-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#9AA7B4;margin-bottom:4px}
+.agg-lifecycle{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.agg-ls{font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid #D0DCF0;background:#F4F7FC;color:#5B6F8A}
+.agg-arr{color:#C0C8D4;font-size:10px}
+.agg-vos{display:flex;flex-wrap:wrap;gap:4px}
+.agg-vo{font-size:10px;padding:2px 7px;border-radius:10px;background:#E8F4FD;border:1px solid #90CAF9;color:#1565C0}
+.agg-invs{list-style:none;display:flex;flex-direction:column;gap:3px}
+.agg-invs li{font-size:11px;color:#3D3D5C;padding-left:16px;position:relative;line-height:1.5}
+.agg-invs li::before{content:'⚠';position:absolute;left:0;font-size:9px;top:2px;color:#F15A24}
+.agg-cmds{width:100%;border-collapse:collapse;font-size:11px}
+.agg-cmds tr{border-bottom:1px solid #F5F5F5}
+.agg-cmds tr:last-child{border-bottom:none}
+.agg-cmds td{padding:3px 5px;vertical-align:top}
+.agg-cmds td:first-child{font-family:monospace;color:#1565C0;white-space:nowrap}
+.agg-cmds td:last-child{color:#2E7D32;font-weight:600}
+/* aggregate colour themes */
+.agg.t-blue .agg-hdr{background:#E3F2FD;border-bottom:1px solid #BBDEFB;color:#1565C0}
+.agg.t-purple .agg-hdr{background:#F3E5F5;border-bottom:1px solid #E1BEE7;color:#6A1B9A}
+.agg.t-green .agg-hdr{background:#E8F5E9;border-bottom:1px solid #C8E6C9;color:#1B5E20}
+.agg.t-amber .agg-hdr{background:#FFF8E1;border-bottom:1px solid #FFE082;color:#7A5000}
+.agg.t-pink .agg-hdr{background:#FCE4EC;border-bottom:1px solid #F8BBD0;color:#880E4F}
+.agg.t-teal .agg-hdr{background:#E0F2F1;border-bottom:1px solid #B2DFDB;color:#004D40}
+
+/* VIOLATION BADGE on domain cards */
+.vio-badge{display:inline-block;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;margin-left:6px}
+.vio-badge.P0{background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2}
+.vio-badge.P1{background:#FFF8E1;color:#7A5000;border:1px solid #FFE082}
+
+/* GAP ANALYSIS TABLE */
+.gap-table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;font-size:12px}
+.gap-table th{background:#1E1B3C;color:#fff;padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.gap-table td{padding:10px 14px;border-bottom:1px solid #F4F4F4;vertical-align:top;line-height:1.5}
+.gap-table tr:last-child td{border-bottom:none}
+.gap-table tr:hover td{background:#FAFAFA}
+.sev{font-weight:800;font-size:11px}
+.sev.P0{color:#C62828}
+.sev.P1{color:#7A5000}
+.sev.P2{color:#1B5E20}
+.cat-pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700}
+.cat-pill.anemic{background:#FFEBEE;color:#C62828}
+.cat-pill.layer{background:#E3F2FD;color:#1565C0}
+.cat-pill.missing{background:#F3E5F5;color:#6A1B9A}
+.cat-pill.infra{background:#E8F5E9;color:#1B5E20}
+.gap-summary{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.gap-chip{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700}
+.gap-chip.p0{background:#FFEBEE;color:#C62828;border:1.5px solid #FFCDD2}
+.gap-chip.p1{background:#FFF8E1;color:#7A5000;border:1.5px solid #FFE082}
+.gap-chip.p2{background:#E8F5E9;color:#1B5E20;border:1.5px solid #C8E6C9}
+
+.hdr-r{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.hdr-meta{font-size:11px;color:#9AA7B4}
+
+/* Service switcher */
+.svc-select{appearance:none;-webkit-appearance:none;background:#F4F7FC url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235B6F8A'/%3E%3C/svg%3E") no-repeat right 9px center;border:1px solid #D0DCF0;border-radius:20px;padding:3px 26px 3px 10px;font-size:11px;font-weight:600;color:#5B6F8A;font-family:monospace;cursor:pointer;outline:none}
+.svc-select:focus{border-color:#F15A24}
+
+/* Analyze button */
+.analyze-btn{padding:5px 14px;background:#F15A24;color:#fff;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s;white-space:nowrap}
+.analyze-btn:hover{background:#D94F1E}
+
+/* Mode toggle */
+.ap-mode{display:flex;background:#F4F7FC;border:1px solid #E5E5E5;border-radius:8px;padding:3px;gap:2px;align-self:flex-start}
+.ap-mode-btn{padding:5px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:#9AA7B4;transition:all .15s}
+.ap-mode-btn.active{background:#fff;color:#1E1B3C;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.ap-mode-btn.url.active{background:#F15A24;color:#fff}
+
+/* Folder picker row */
+.ap-path-row{display:flex;gap:8px;align-items:stretch}
+.ap-path-row .ap-input{flex:1;min-width:0}
+.ap-pick-btn{padding:0 14px;background:#F4F7FC;border:1px solid #D0DCF0;border-radius:7px;font-size:12px;font-weight:600;color:#5B6F8A;cursor:pointer;white-space:nowrap;transition:background .15s}
+.ap-pick-btn:hover{background:#E8EEF8;border-color:#B0C4DE}
+.ap-pick-btn:disabled{opacity:.5;cursor:not-allowed}
+.ap-folder-tag{display:flex;align-items:center;gap:6px;padding:5px 10px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;font-size:12px;color:#1E40AF;font-family:monospace}
+.ap-folder-tag button{background:none;border:none;cursor:pointer;color:#93C5FD;font-size:13px;line-height:1;padding:0 2px}
+.ap-folder-tag button:hover{color:#1E40AF}
+.ap-hint{font-size:11px;color:#9AA7B4;margin-top:-4px}
+
+/* ── ANALYZE PANEL ── */
+.ap-overlay{position:fixed;inset:0;z-index:200;background:rgba(10,8,30,.45);display:flex;align-items:center;justify-content:center;animation:ap-in .15s ease}
+@keyframes ap-in{from{opacity:0}to{opacity:1}}
+.ap-panel{width:540px;max-width:calc(100vw - 32px);background:#fff;border-radius:12px;box-shadow:0 24px 64px rgba(0,0,0,.18);display:flex;flex-direction:column;overflow:hidden;animation:ap-up .18s ease}
+@keyframes ap-up{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+.ap-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #EAEAEA}
+.ap-title{font-size:15px;font-weight:700;color:#1E1B3C}
+.ap-close{background:none;border:none;cursor:pointer;font-size:16px;color:#9AA7B4;padding:2px 6px;border-radius:4px}
+.ap-close:hover{background:#F4F4F4;color:#1E1B3C}
+.ap-form{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.ap-label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#5B6F8A}
+.ap-optional{font-weight:400;color:#9AA7B4;display:inline}
+.ap-input{padding:8px 12px;border:1px solid #D0DCF0;border-radius:7px;font-size:13px;font-family:monospace;color:#1E1B3C;outline:none;transition:border-color .15s}
+.ap-input:focus{border-color:#F15A24}
+.ap-input:disabled{background:#F8F8F8;color:#9AA7B4}
+.ap-submit{align-self:flex-start;padding:8px 20px;background:#F15A24;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.ap-submit:hover:not(:disabled){background:#D94F1E}
+.ap-submit:disabled{background:#F5B49A;cursor:not-allowed}
+.ap-log-wrap{margin:0 20px 12px;border:1px solid #EAEAEA;border-radius:8px;overflow:hidden}
+.ap-log-title{padding:7px 12px;background:#F8F9FB;font-size:11px;font-weight:700;color:#5B6F8A;border-bottom:1px solid #EAEAEA;display:flex;align-items:center;gap:6px}
+.ap-pulse{width:7px;height:7px;border-radius:50%;background:#F15A24;animation:pulse 1s ease infinite;display:inline-block}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.ap-log{background:#0E0E1A;padding:10px 14px;max-height:200px;overflow-y:auto;font-family:monospace;font-size:12px;line-height:1.7}
+.ap-log-line{color:#B0BEC5;white-space:pre-wrap}
+.ap-log-cursor{color:#F15A24;animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.ap-error{margin:0 20px 14px;padding:10px 14px;background:#FFF3F3;border:1px solid #FFD0CC;border-radius:7px;font-size:12px;color:#C0392B}
+.ap-done{margin:0 20px 20px;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#F0FBF4;border:1px solid #B8E8C8;border-radius:8px;font-size:13px;color:#1E5F3A;gap:12px}
+.ap-done code{font-family:monospace;background:#D8F3E3;padding:1px 6px;border-radius:4px}
+.ap-load-btn{padding:7px 16px;background:#27AE60;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.ap-load-btn:hover{background:#1E9950}
 
 /* IMPACT BAR */
 .impact-bar{background:#fff;border-bottom:1px solid #E5E5E5;padding:10px 24px;display:flex;flex-direction:column;gap:8px}
@@ -175,27 +297,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 <body>
 <div id="root"></div>
 <script>
-const {useState,useEffect,createElement:h}=React;
+const {useState,useEffect,useRef,createElement:h}=React;
 const API=window.location.origin;
 const HEALTH_LABEL={'good':'✅ Rich','partial':'🟡 Partial','anemic':'🔴 Anemic'};
 const HEALTH_CLS={'good':'health-good','partial':'health-partial','anemic':'health-anemic'};
 const CHIP_CLS={api:'api',domain:'domain',kafka:'kafka',background:'background',external:'external',violation:'violation'};
 
 // ── IMPACT BAR ────────────────────────────────────────
-function ImpactBar({onSearch,counts}){
+function ImpactBar({onSearch,counts,loading}){
   const[v,setV]=useState('');
-  const submit=e=>{e.preventDefault();onSearch(v)};
+  const submit=e=>{e.preventDefault();if(v.trim())onSearch(v)};
   return h('div',{className:'impact-bar'},
     h('form',{className:'impact-form',onSubmit:submit},
       h('span',null,'⚡'),
-      h('input',{className:'impact-input',placeholder:"Type a requirement to see critical path… e.g. 'AI metadata tagging'",value:v,onChange:e=>setV(e.target.value)}),
-      h('button',{className:'impact-btn',type:'submit'},'Analyse Impact'),
-      counts&&h('button',{className:'impact-clear',type:'button',onClick:()=>{setV('');onSearch('')}},'✕ Clear')
+      h('input',{className:'impact-input',
+        placeholder:"Type a requirement to see critical path impact… e.g. 'AI metadata tagging on checkout'",
+        value:v,onChange:e=>setV(e.target.value),disabled:loading}),
+      loading
+        ? h('button',{className:'impact-btn',type:'button',disabled:true,style:{display:'flex',alignItems:'center',gap:6}},
+            h('span',{style:{width:12,height:12,border:'2px solid rgba(255,255,255,.4)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}),
+            'Analysing…')
+        : h('button',{className:'impact-btn',type:'submit',disabled:!v.trim()},'Analyse Impact'),
+      !loading&&counts&&h('button',{className:'impact-clear',type:'button',onClick:()=>{setV('');onSearch('')}},'✕ Clear')
     ),
-    counts&&h('div',{className:'impact-summary'},
+    counts&&!loading&&h('div',{className:'impact-summary'},
       h('span',{className:'badge direct'},`🔴 ${counts.direct} directly impacted`),
       h('span',{className:'badge indirect'},`🟡 ${counts.indirect} indirectly affected`),
-      h('span',{className:'badge none-b'},`⚪ ${counts.none} unchanged`)
+      h('span',{className:'badge none-b'},`⚪ ${counts.none} unchanged`),
+      window._impactEngine==='semantic'&&h('span',{style:{fontSize:10,color:'#9AA7B4',marginLeft:4}},'✦ semantic')
     )
   );
 }
@@ -336,18 +465,31 @@ function WorkflowPanel({workflows,impact,selected,onSelect,filterDomainId}){
   return h('div',{className:'wf-panel'},
     list.map(wf=>{
       const lvl=impact?.workflowScores[wf.id]??'none';
+      const wi=impact?.workflowImpacts?.[wf.id];
+      const affectedSteps=new Set(wi?.affectedSteps||[]);
+      const criticalPath=wi?.criticalPath||'';
       const open=selected===wf.id;
+      // Auto-open impacted workflows when impact is active
+      const isOpen=open||(impact&&lvl!=='none'&&selected===null);
       return h('div',{key:wf.id,className:['wf-row',impact?`wf-${lvl}`:''].filter(Boolean).join(' ')},
         h('button',{className:'wf-hdr',onClick:()=>onSelect(open?null:wf.id)},
           h('span',{className:'wf-name'},wf.name),
           impact&&lvl!=='none'&&h('span',{className:`wf-badge ${lvl}`},lvl==='direct'?'🔴 IMPACTED':'🟡 AFFECTED'),
-          h('span',{className:'wf-chev'},open?'▲':'▼')
+          h('span',{className:'wf-chev'},isOpen?'▲':'▼')
         ),
-        open&&h('div',{className:'wf-steps'},
-          wf.steps.map((s,i)=>h('div',{key:i,className:'step-row'},
-            i>0&&h('span',{className:'step-arr'},'→'),
-            h('span',{className:`chip ${CHIP_CLS[s.type]??''}`},s.label)
-          ))
+        // Critical path summary (semantic only)
+        isOpen&&criticalPath&&h('div',{style:{padding:'4px 16px 0',fontSize:11,color:lvl==='direct'?'#C62828':'#7A5000',fontStyle:'italic'}},
+          '⟶ '+criticalPath),
+        isOpen&&h('div',{className:'wf-steps',style:{paddingBottom:8}},
+          wf.steps.map((s,i)=>{
+            const isOnPath=affectedSteps.size>0&&affectedSteps.has(i);
+            const chipStyle=isOnPath?{outline:'2px solid '+(lvl==='direct'?'#EF5350':'#FFC107'),outlineOffset:1,fontWeight:700}:{opacity:affectedSteps.size>0?0.45:1};
+            return h('div',{key:i,className:'step-row'},
+              i>0&&h('span',{className:'step-arr',style:{color:isOnPath?'#F15A24':'#C0C8D4'}},'→'),
+              h('span',{className:`chip ${CHIP_CLS[s.type]??''}`,style:chipStyle},
+                isOnPath&&'⚡ ',s.label)
+            );
+          })
         )
       );
     })
@@ -355,50 +497,802 @@ function WorkflowPanel({workflows,impact,selected,onSelect,filterDomainId}){
 }
 
 // ── SIDEBAR ───────────────────────────────────────────
-function Sidebar({domains,selected,onSelect,impact}){
+function Sidebar({domains,selected,onSelect,impact,view}){
+  const isAggView=view==='ddd';
+  const items=isAggView
+    ?domains.filter(d=>d.dddTarget?.aggregate&&!d.dddTarget.aggregate.includes('not found')&&!d.dddTarget.aggregate.includes('Delegated')&&!d.dddTarget.aggregate.includes('Coordinated'))
+    :domains;
   return h('aside',{className:'sidebar'},
-    h('div',{className:'sb-title'},'Domains'),
+    h('div',{className:'sb-title'},isAggView?'Aggregate Models':'Domains'),
     h('div',{className:'sb-item',style:{color:selected?'#9AA7B4':'#1E1B3C',fontWeight:selected?400:600},onClick:()=>onSelect(null)},
       h('span',{className:'sb-icon'},'🗂'),
-      h('span',null,'All domains')
+      h('span',null,isAggView?'All aggregates':'All domains')
     ),
-    domains.map(d=>{
+    items.map(d=>{
       const lvl=impact?.domainScores[d.id]?.level??'none';
-      const cls=['sb-item',selected===d.id?'selected':'',impact&&lvl!=='none'?`impact-${lvl}`:''].filter(Boolean).join(' ');
-      return h('div',{key:d.id,className:cls,onClick:()=>onSelect(d.id===selected?null:d.id)},
+      const key=isAggView?(d.dddTarget?.aggregate||d.id):d.id;
+      const cls=['sb-item',selected===key?'selected':'',impact&&lvl!=='none'?`impact-${lvl}`:''].filter(Boolean).join(' ');
+      const label=isAggView?(d.dddTarget?.aggregate||d.name):d.name;
+      return h('div',{key:key,className:cls,onClick:()=>onSelect(key===selected?null:key)},
         h('span',{className:'sb-icon'},d.icon),
-        h('span',null,d.name),
-        h('span',{className:`sb-health ${HEALTH_CLS[d.health]}`},d.health==='good'?'✅':d.health==='partial'?'🟡':'🔴')
+        h('span',null,label),
+        !isAggView&&h('span',{className:`sb-health ${HEALTH_CLS[d.health]}`},d.health==='good'?'✅':d.health==='partial'?'🟡':'🔴')
       );
     })
   );
 }
 
+// ── AGGREGATE CONTEXT DIAGRAM ─────────────────────────
+const AGG_COLORS=['#3b82f6','#8b5cf6','#f59e0b','#ef4444','#10b981','#06b6d4','#ec4899','#64748b'];
+const AGG_LIGHT=['#eff6ff','#faf5ff','#fffbeb','#fff1f2','#f0fdf4','#ecfeff','#fdf2f8','#f8fafc'];
+
+function AggregateDiagram_OLD_UNUSED({data}){
+  if(!data)return null;
+  const bc=data.boundedContext||{};
+  // Only domains with a real aggregate root
+  const aggs=data.domains.filter(d=>
+    d.dddTarget&&d.dddTarget.aggregate&&
+    !d.dddTarget.aggregate.includes('not found')&&
+    !d.dddTarget.aggregate.includes('Delegated')&&
+    !d.dddTarget.aggregate.includes('Coordinated')
+  );
+  if(!aggs.length)return null;
+
+  // Layout: up to 4 per row
+  const cols=Math.min(4,aggs.length);
+  const rows=Math.ceil(aggs.length/cols);
+  const W=1060, PAD=80, CARD_W=200, CARD_H=160, GAP=24;
+  const totalW=cols*CARD_W+(cols-1)*GAP;
+  const totalH=rows*CARD_H+(rows-1)*GAP;
+  const startX=(W-totalW)/2;
+  const startY=80;
+  const svgH=startY+totalH+200; // space for bottom HTTP deps
+
+  const kafkaIn=bc.consumes||[];
+  const kafkaOut=bc.publishes||[];
+  const http=bc.dependsOn||[];
+
+  return h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:16,overflowX:'auto',marginBottom:24}},
+    h('div',{style:{fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10}},'Aggregate Context Diagram'),
+    h('svg',{viewBox:`0 0 ${W} ${svgH}`,xmlns:'http://www.w3.org/2000/svg',style:{width:'100%',minWidth:600,fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif'}},
+
+      // Bounded context boundary
+      h('rect',{x:PAD/2,y:30,width:W-PAD,height:startY+totalH+20,rx:14,fill:'none',stroke:'#94a3b8',strokeWidth:2,strokeDasharray:'8,4'}),
+      h('text',{x:W/2,y:22,textAnchor:'middle',fontSize:12,fontWeight:700,fill:'#64748b'},data.service+' bounded context'),
+
+      // Aggregate boxes
+      ...aggs.map((d,i)=>{
+        const col=i%cols, row=Math.floor(i/cols);
+        const x=startX+col*(CARD_W+GAP), y=startY+row*(CARD_H+GAP);
+        const color=AGG_COLORS[i%AGG_COLORS.length];
+        const light=AGG_LIGHT[i%AGG_LIGHT.length];
+        const t=d.dddTarget;
+        const vos=(t.valueObjects||[]).slice(0,3);
+        const lc=(t.lifecycle||[]).slice(0,4);
+        return h('g',{key:d.id},
+          h('rect',{x,y,width:CARD_W,height:CARD_H,rx:8,fill:light,stroke:color,strokeWidth:2}),
+          // header
+          h('rect',{x,y,width:CARD_W,height:28,rx:8,fill:color}),
+          h('rect',{x,y:y+14,width:CARD_W,height:14,fill:color}),
+          h('text',{x:x+8,y:y+18,fontSize:11,fontWeight:700,fill:'white'},d.icon+' '+t.aggregate),
+          h('text',{x:x+8,y:y+40,fontSize:9,fill:'#64748b'},'id: '+t.identity.slice(0,30)),
+          // lifecycle
+          lc.length>0&&h('g',null,
+            h('text',{x:x+8,y:y+58,fontSize:8,fontWeight:700,fill:'#94a3b8'},'LIFECYCLE'),
+            h('g',{transform:`translate(${x+8},${y+64})`},
+              ...lc.map((s,j)=>[
+                h('rect',{key:s,x:j*46,width:40,height:13,rx:6,fill:'#f1f5f9'}),
+                h('text',{key:s+'t',x:j*46+20,y:10,textAnchor:'middle',fontSize:8,fill:'#475569'},s.slice(0,7)),
+                j<lc.length-1&&h('text',{key:s+'a',x:j*46+42,y:10,fontSize:8,fill:'#94a3b8'},'→')
+              ].flat().filter(Boolean))
+            )
+          ),
+          // value objects
+          vos.length>0&&h('g',null,
+            h('text',{x:x+8,y:y+96,fontSize:8,fontWeight:700,fill:'#94a3b8'},'VALUE OBJECTS'),
+            h('g',{transform:`translate(${x+8},${y+102})`},
+              vos.map((vo,j)=>h('g',{key:vo},
+                h('rect',{x:j*64,width:58,height:13,rx:6,fill:'#dbeafe',stroke:'#bfdbfe'}),
+                h('text',{x:j*64+29,y:9,textAnchor:'middle',fontSize:7,fill:'#1d4ed8',fontFamily:'monospace'},vo.slice(0,9))
+              ))
+            )
+          ),
+          // command count
+          h('text',{x:x+8,y:y+CARD_H-8,fontSize:9,fill:color,fontWeight:600},
+            (t.commands||[]).length+' commands · '+(t.invariants||[]).length+' invariants'
+          )
+        );
+      }),
+
+      // Kafka IN (left side)
+      kafkaIn.length>0&&h('g',null,
+        h('text',{x:8,y:startY-8,fontSize:9,fontWeight:700,fill:'#1d4ed8'},'← Kafka IN'),
+        ...kafkaIn.slice(0,5).map((t,i)=>h('g',{key:t},
+          h('rect',{x:4,y:startY+i*22,width:PAD/2-8,height:16,rx:4,fill:'#dbeafe',stroke:'#93c5fd'}),
+          h('text',{x:PAD/4,y:startY+i*22+11,textAnchor:'middle',fontSize:7,fill:'#1d4ed8',fontFamily:'monospace'},
+            t.split('.').pop().slice(0,12))
+        )),
+        h('line',{x1:PAD/2-4,y1:startY+50,x2:PAD/2+4,y2:startY+50,stroke:'#3b82f6',strokeWidth:1,strokeDasharray:'3,2',markerEnd:'url(#arr-in)'})
+      ),
+
+      // Kafka OUT (right side)
+      kafkaOut.length>0&&h('g',null,
+        h('text',{x:W-PAD/2+4,y:startY-8,fontSize:9,fontWeight:700,fill:'#065f46'},'Kafka OUT →'),
+        ...kafkaOut.slice(0,5).map((t,i)=>h('g',{key:t},
+          h('rect',{x:W-PAD/2+4,y:startY+i*22,width:PAD/2-8,height:16,rx:4,fill:'#d1fae5',stroke:'#6ee7b7'}),
+          h('text',{x:W-PAD/4,y:startY+i*22+11,textAnchor:'middle',fontSize:7,fill:'#065f46',fontFamily:'monospace'},
+            t.split('.').pop().slice(0,12))
+        ))
+      ),
+
+      // HTTP deps bottom
+      http.length>0&&h('g',null,
+        h('text',{x:W/2,y:startY+totalH+48,textAnchor:'middle',fontSize:9,fontWeight:700,fill:'#64748b'},'HTTP Dependencies'),
+        ...http.slice(0,7).map((dep,i)=>{
+          const total=Math.min(http.length,7);
+          const bw=110, gap=8;
+          const totalBW=total*(bw+gap)-gap;
+          const bx=(W-totalBW)/2+i*(bw+gap);
+          const by=startY+totalH+56;
+          const label=dep.replace(/\s*—.*$/,'').trim();
+          return h('g',{key:dep},
+            h('rect',{x:bx,y:by,width:bw,height:18,rx:4,fill:'#f8fafc',stroke:'#e2e8f0'}),
+            h('text',{x:bx+bw/2,y:by+12,textAnchor:'middle',fontSize:9,fill:'#374151'},label.slice(0,16))
+          );
+        })
+      ),
+
+      // Arrow markers
+      h('defs',null,
+        h('marker',{id:'arr-in',markerWidth:6,markerHeight:5,refX:6,refY:2.5,orient:'auto'},
+          h('polygon',{points:'0 0,6 2.5,0 5',fill:'#3b82f6'}))
+      )
+    )
+  );
+}
+
+// ── AGGREGATE CONTEXT DIAGRAM — DDD standard ──────────
+const BOX_W=210, BOX_H=216, H_GAP=80, V_GAP=70, COLS=3;
+
+// Grid layout: left→right, top→bottom. Most-connected first.
+function gridLayout(aggs, wfs){
+  const score={};
+  aggs.forEach(a=>{score[a.id]=0;});
+  (wfs||[]).forEach(wf=>(wf.domains||[]).forEach(id=>{if(score[id]!=null)score[id]++;}));
+  const sorted=[...aggs].sort((a,b)=>score[b.id]-score[a.id]);
+  const posMap={};
+  sorted.forEach((a,i)=>{
+    const col=i%COLS, row=Math.floor(i/COLS);
+    const p={
+      col, row,
+      cx: col*(BOX_W+H_GAP)+BOX_W/2,
+      cy: row*(BOX_H+V_GAP)+BOX_H/2,
+      x:  col*(BOX_W+H_GAP),
+      y:  row*(BOX_H+V_GAP),
+    };
+    posMap[i]=p;                          // unique key by index (for renderBox)
+    if(posMap[a.id]==null)posMap[a.id]=p; // first occurrence wins (for arrow routing)
+  });
+  return{sorted, pos:posMap};
+}
+
+function AggregateDiagram({data,highlightId}){
+  if(!data)return null;
+  const bc=data.boundedContext||{};
+
+  const aggs=data.domains.filter(d=>
+    d.dddTarget?.aggregate&&
+    !d.dddTarget.aggregate.includes('not found')&&
+    !d.dddTarget.aggregate.includes('Delegated')&&
+    !d.dddTarget.aggregate.includes('Coordinated')
+  );
+  if(!aggs.length)return null;
+
+  const {sorted,pos}=gridLayout(aggs,data.workflows||[]);
+  const cols=Math.min(COLS,sorted.length);
+  const rows=Math.ceil(sorted.length/COLS);
+  const INNER_W=cols*(BOX_W+H_GAP)-H_GAP;
+  const INNER_H=rows*(BOX_H+V_GAP)-V_GAP;
+  const LEFT=80, TOP=52;
+  const W=LEFT+INNER_W+LEFT+120; // +120 for Kafka labels on right
+
+  // ── RELATIONSHIPS: explicit workflow sequences only ───────────────────────
+  const relMap={};
+  (data.workflows||[]).forEach(wf=>{
+    const doms=(wf.domains||[]).filter(id=>pos[id]);
+    const hasVio=wf.steps?.some(s=>s.type==='violation');
+    for(let i=0;i<doms.length-1;i++){
+      const key=doms[i]+'→'+doms[i+1];
+      if(relMap[key])continue;
+      const steps=wf.steps||[];
+      const evtStep=steps.find(s=>s.type==='kafka');
+      const rawLabel=evtStep?evtStep.label
+        .replace(/^[←→]\s*(Kafka\s*)?(OUT|IN|out|in):\s*/i,'')
+        .replace(/^eventbus\.[^.]+\.[^.]+\./,'')
+        .replace(/^SearchProducer\s*→\s*/,'')
+        .slice(0,22):'';
+      relMap[key]={from:doms[i],to:doms[i+1],label:rawLabel,vio:hasVio,wfName:wf.name};
+    }
+  });
+  const rels=Object.values(relMap);
+
+  const kafkaIn=bc.consumes||[], kafkaOut=bc.publishes||[], http=bc.dependsOn||[];
+  const svgH=TOP+INNER_H+180; // bottom space for HTTP deps + legend
+
+  // ── Orthogonal arrow: routes through the gap lane, never through a box ───
+  // If same row: horizontal line through the H_GAP lane between them
+  // If same col: vertical line through the V_GAP lane between them
+  // Otherwise: L-shaped path via a corner waypoint
+  function routeArrow(fromId, toId){
+    const fp=pos[fromId], tp=pos[toId];
+    if(!fp||!tp)return null;
+    const fx=LEFT+fp.cx, fy=TOP+fp.cy;
+    const tx=LEFT+tp.cx, ty=TOP+tp.cy;
+
+    if(fp.row===tp.row){
+      // Same row — horizontal
+      const midX=(LEFT+fp.x+BOX_W+LEFT+tp.x)/2; // lane centre between boxes
+      return{path:`M ${fx} ${fy+12} H ${midX} V ${ty-12} H ${tx}`,  // straight H
+             lx:midX, ly:fy};
+    } else if(fp.col===tp.col){
+      // Same column — vertical
+      const midY=(TOP+fp.y+BOX_H+TOP+tp.y)/2;
+      return{path:`M ${fx+12} ${fy} V ${midY} H ${tx-12} V ${ty}`,
+             lx:fx, ly:midY};
+    } else {
+      // L-shaped: horizontal then vertical
+      const cornerX=tx, cornerY=fy;
+      return{path:`M ${fx} ${fy} H ${cornerX} V ${ty}`,
+             lx:(fx+cornerX)/2, ly:fy};
+    }
+  }
+
+  // ── Single aggregate box — DDD UML style ──────────────
+  function renderBox(d,i){
+    const p=pos[i];
+    if(!p)return null;
+    const x=LEFT+p.x, y=TOP+p.y;
+    const cx=x+BOX_W/2;
+    const color=AGG_COLORS[i%AGG_COLORS.length];
+    const t=d.dddTarget;
+    const lc=(t.lifecycle||[]).slice(0,5);
+    const vos=(t.valueObjects||[]).slice(0,4);
+    const cmds=(t.commands||[]).slice(0,3);
+    const invCount=(t.invariants||[]).length;
+    const isCore=(i===0);
+    const isHighlighted=(t.aggregate===highlightId);
+
+    // Row Y offsets within box (fixed, content fits within BOX_H=216)
+    const yStereotype=14;
+    const yName=27;
+    const ySep1=38;
+    const yId=50;
+    const ySep2=62;
+    const yLcLabel=72;
+    const yLcPills=82;
+    const ySep3=101;
+    const yVoLabel=109;
+    const yVoPills=119;
+    const ySep4=136;
+    const yCmdStart=144;
+    const yFooter=BOX_H-20;
+
+    return h('g',{key:d.id},
+      isHighlighted&&h('rect',{x:x-6,y:y-6,width:BOX_W+12,height:BOX_H+12,rx:11,fill:color,opacity:0.12}),
+      isHighlighted&&h('rect',{x:x-4,y:y-4,width:BOX_W+8,height:BOX_H+8,rx:9,fill:'none',stroke:color,strokeWidth:2.5,strokeDasharray:'5,3',opacity:0.7}),
+      isCore&&h('rect',{x:x+3,y:y+3,width:BOX_W,height:BOX_H,rx:7,fill:'rgba(0,0,0,0.06)'}),
+      // Box shell
+      h('rect',{x,y,width:BOX_W,height:BOX_H,rx:7,fill:isHighlighted?color+'0d':'#fff',stroke:color,strokeWidth:isHighlighted?3:isCore?2.5:1.5}),
+      // Top accent strip
+      h('rect',{x,y,width:BOX_W,height:5,rx:7,fill:color}),
+      h('rect',{x,y:y+3,width:BOX_W,height:2,fill:color}),
+
+      // «aggregate root» stereotype
+      h('text',{x:cx,y:y+yStereotype,textAnchor:'middle',fontSize:8,fill:color,fontStyle:'italic'},'«aggregate root»'),
+      // Entity name
+      h('text',{x:cx,y:y+yName,textAnchor:'middle',fontSize:12,fontWeight:700,fill:'#0f172a'},
+        t.aggregate.replace(/\s*\([^)]*\)/,'').trim()),
+
+      h('line',{x1:x+6,y1:y+ySep1,x2:x+BOX_W-6,y2:y+ySep1,stroke:'#e2e8f0',strokeWidth:1}),
+      // Identity (italic)
+      h('text',{x:x+8,y:y+yId,fontSize:7.5,fill:'#64748b',fontStyle:'italic'},
+        'id: '+(t.identity||'').replace(/·.*/,'').trim().slice(0,26)),
+
+      h('line',{x1:x+6,y1:y+ySep2,x2:x+BOX_W-6,y2:y+ySep2,stroke:'#e2e8f0',strokeWidth:1}),
+      // Lifecycle
+      lc.length>0&&h('g',null,
+        h('text',{x:x+8,y:y+yLcLabel,fontSize:7,fontWeight:700,fill:'#94a3b8',textTransform:'uppercase'},'Lifecycle'),
+        h('g',{transform:`translate(${x+8},${y+yLcPills})`},
+          lc.map((s,j)=>[
+            j>0&&h('text',{key:s+'a',x:j*36-2,y:11,fontSize:8,fill:'#cbd5e1'},'→'),
+            h('rect',{key:s+'r',x:j*36+(j>0?5:0),width:30,height:14,rx:4,fill:color+'15',stroke:color+'40'}),
+            h('text',{key:s+'t',x:j*36+(j>0?5:0)+15,y:10,textAnchor:'middle',fontSize:7,fill:color,fontWeight:600},s.slice(0,7))
+          ].filter(Boolean)).flat()
+        )
+      ),
+
+      h('line',{x1:x+6,y1:y+ySep3,x2:x+BOX_W-6,y2:y+ySep3,stroke:'#e2e8f0',strokeWidth:1}),
+      // Value objects
+      vos.length>0&&h('g',null,
+        h('text',{x:x+8,y:y+yVoLabel,fontSize:7,fontWeight:700,fill:'#94a3b8'},'Value Objects'),
+        h('g',{transform:`translate(${x+8},${y+yVoPills})`},
+          vos.map((vo,j)=>h('g',{key:vo},
+            h('rect',{x:(j%2)*97,y:Math.floor(j/2)*15,width:90,height:12,rx:3,fill:color+'12',stroke:color+'35'}),
+            h('text',{x:(j%2)*97+45,y:Math.floor(j/2)*15+9,textAnchor:'middle',fontSize:7,fill:color,fontFamily:'monospace'},vo.slice(0,12))
+          ))
+        )
+      ),
+
+      h('line',{x1:x+6,y1:y+ySep4,x2:x+BOX_W-6,y2:y+ySep4,stroke:'#e2e8f0',strokeWidth:1}),
+      // Commands
+      h('g',{transform:`translate(${x+8},${y+yCmdStart})`},
+        cmds.map((c,j)=>h('g',{key:c.cmd},
+          h('text',{x:0,y:j*13+9,fontSize:7.5,fill:'#1d4ed8',fontFamily:'monospace'},c.cmd.split('(')[0]+'()'),
+          h('text',{x:BOX_W-18,y:j*13+9,textAnchor:'end',fontSize:7,fill:'#16a34a'},'→'+c.event.slice(0,14))
+        )),
+        (t.commands||[]).length>3&&h('text',{x:0,y:3*13+9,fontSize:7,fill:'#94a3b8'},
+          '+'+(t.commands.length-3)+' more…')
+      ),
+
+      // Footer strip
+      h('rect',{x,y:y+yFooter,width:BOX_W,height:20,fill:color+'14',rx:4}),
+      h('line',{x1:x,y1:y+yFooter,x2:x+BOX_W,y2:y+yFooter,stroke:color+'44',strokeWidth:1}),
+      h('text',{x:cx,y:y+yFooter+13,textAnchor:'middle',fontSize:7.5,fill:color,fontWeight:600},
+        invCount+' invariant'+(invCount!==1?'s':'')+'  ·  '+(t.commands||[]).length+' commands')
+    );
+  }
+
+  return h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,
+      padding:'16px',overflowX:'auto',marginBottom:24}},
+    h('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:10}},
+      h('span',{style:{fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'.07em'}},
+        'Aggregate Context Diagram'),
+      h('span',{style:{fontSize:10,color:'#94a3b8'}},
+        '— relationships from explicit workflow sequences · DDD UML notation')
+    ),
+    h('svg',{viewBox:`0 0 ${W} ${svgH}`,xmlns:'http://www.w3.org/2000/svg',
+      style:{width:'100%',minWidth:620,display:'block',fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif'}},
+
+      h('defs',null,
+        h('marker',{id:'m-ev',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#f59e0b'})),
+        h('marker',{id:'m-vi',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#ef4444'}))
+      ),
+
+      // Bounded context dashed background
+      h('rect',{x:LEFT-12,y:TOP-12,width:INNER_W+24,height:INNER_H+24,
+        rx:12,fill:'#fafbfc',stroke:'#cbd5e1',strokeWidth:1.5,strokeDasharray:'8,4'}),
+      h('text',{x:LEFT-6,y:TOP-18,fontSize:10,fontWeight:700,fill:'#64748b'},
+        data.service+' — bounded context'),
+
+      // ── RELATIONSHIP ARROWS (drawn first so boxes paint over stubs) ───────
+      ...rels.map(rel=>{
+        const route=routeArrow(rel.from,rel.to);
+        if(!route)return null;
+        const color=rel.vio?'#ef4444':'#f59e0b';
+        const marker=rel.vio?'m-vi':'m-ev';
+        const dash=rel.vio?'6,3':'none';
+        return h('g',{key:rel.from+'→'+rel.to},
+          h('path',{d:route.path,fill:'none',stroke:color,strokeWidth:1.8,
+            strokeDasharray:dash,markerEnd:`url(#${marker})`}),
+          rel.label&&h('g',null,
+            h('rect',{x:route.lx-rel.label.length*2.8-2,y:route.ly-18,
+              width:rel.label.length*5.4+4,height:12,rx:3,fill:'#ffffffef',stroke:color+'44'}),
+            h('text',{x:route.lx,y:route.ly-8,textAnchor:'middle',
+              fontSize:8,fill:color,fontWeight:600},rel.label)
+          ),
+          h('title',null,rel.wfName)
+        );
+      }),
+
+      // ── AGGREGATE BOXES ──────────────────────────────────────────────────
+      ...sorted.map((d,i)=>renderBox(d,i)),
+
+      // ── KAFKA IN/OUT (below bounded context box) ──────────────────────────
+      h('g',{transform:`translate(${LEFT-12},${TOP+INNER_H+36})`},
+        // Kafka IN
+        kafkaIn.length>0&&h('g',null,
+          h('text',{x:0,y:0,fontSize:9,fontWeight:700,fill:'#1d4ed8'},'Kafka IN (consumed)'),
+          h('g',{transform:'translate(0,8)'},
+            kafkaIn.slice(0,5).map((t,i)=>h('g',{key:t},
+              h('rect',{x:i*180,width:174,height:16,rx:4,fill:'#eff6ff',stroke:'#bfdbfe'}),
+              h('text',{x:i*180+87,y:11,textAnchor:'middle',fontSize:8,fill:'#1d4ed8',fontFamily:'monospace'},
+                t.replace(/^eventbus\.[^.]+\.[^.]+\./,'').slice(0,22))
+            ))
+          )
+        )
+      ),
+      h('g',{transform:`translate(${LEFT-12},${TOP+INNER_H+76})`},
+        kafkaOut.length>0&&h('g',null,
+          h('text',{x:0,y:0,fontSize:9,fontWeight:700,fill:'#065f46'},'Kafka OUT (published)'),
+          h('g',{transform:'translate(0,8)'},
+            kafkaOut.slice(0,4).map((t,i)=>h('g',{key:t},
+              h('rect',{x:i*220,width:214,height:16,rx:4,fill:'#f0fdf4',stroke:'#86efac'}),
+              h('text',{x:i*220+107,y:11,textAnchor:'middle',fontSize:8,fill:'#065f46',fontFamily:'monospace'},
+                t.replace(/^eventbus\.[^.]+\.[^.]+\./,'').slice(0,28))
+            ))
+          )
+        )
+      ),
+      h('g',{transform:`translate(${LEFT-12},${TOP+INNER_H+114})`},
+        http.length>0&&h('g',null,
+          h('text',{x:0,y:0,fontSize:9,fontWeight:700,fill:'#6b7280'},'HTTP Dependencies'),
+          h('g',{transform:'translate(0,8)'},
+            http.slice(0,6).map((dep,i)=>h('g',{key:dep},
+              h('rect',{x:i*180,width:174,height:16,rx:4,fill:'#f9fafb',stroke:'#e5e7eb'}),
+              h('text',{x:i*180+87,y:11,textAnchor:'middle',fontSize:8,fill:'#374151'},
+                dep.replace(/\s*[—–(].*/,'').trim().slice(0,22))
+            ))
+          )
+        )
+      ),
+
+      // ── LEGEND ─────────────────────────────────────────────────────────────
+      h('g',{transform:`translate(${LEFT-12},${svgH-16})`},
+        h('line',{x1:0,y1:5,x2:16,y2:5,stroke:'#f59e0b',strokeWidth:1.8,markerEnd:'url(#m-ev)'}),
+        h('text',{x:20,y:9,fontSize:8,fill:'#64748b'},'Domain event flow (workflow sequence)'),
+        h('line',{x1:230,y1:5,x2:246,y2:5,stroke:'#ef4444',strokeWidth:1.8,strokeDasharray:'5,2',markerEnd:'url(#m-vi)'}),
+        h('text',{x:250,y:9,fontSize:8,fill:'#64748b'},'Workflow with DDD violation')
+      )
+    )
+  );
+}
+
+// ── BOUNDED CONTEXT PANEL ─────────────────────────────
+function BoundedContextPanel({bc}){
+  if(!bc)return null;
+  const groups=[
+    {title:'Owns',items:bc.owns||[]},
+    {title:'Depends On',items:bc.dependsOn||[]},
+    {title:'Publishes',items:bc.publishes||[]},
+    {title:'Consumes',items:bc.consumes||[]},
+  ];
+  return h('div',{className:'bc-panel'},
+    groups.map(g=>h('div',{key:g.title,className:'bc-group'},
+      h('h4',null,g.title),
+      h('ul',null,g.items.map(i=>h('li',{key:i},i)))
+    ))
+  );
+}
+
+// ── AGGREGATE CARDS ────────────────────────────────────
+const AGG_THEMES=['t-blue','t-purple','t-green','t-amber','t-pink','t-teal'];
+function AggregateCards({domains,impact}){
+  const withDdd=domains.filter(d=>d.dddTarget&&d.dddTarget.aggregate&&!d.dddTarget.aggregate.includes('not found')&&!d.dddTarget.aggregate.includes('Delegated')&&!d.dddTarget.aggregate.includes('Coordinated'));
+  if(!withDdd.length)return h('div',{className:'empty'},'No aggregate models defined.');
+  return h('div',{className:'agg-grid'},
+    withDdd.map((d,i)=>{
+      const t=d.dddTarget;
+      const theme=AGG_THEMES[i%AGG_THEMES.length];
+      const lvl=impact?.domainScores[d.id]?.level??'none';
+      return h('div',{key:t.aggregate,id:'agg-'+t.aggregate,className:`agg ${theme}`},
+        h('div',{className:'agg-hdr'},
+          h('span',null,d.icon),
+          h('span',null,t.aggregate),
+          t.identity&&h('span',{className:'agg-identity'},`id: ${t.identity}`)
+        ),
+        h('div',{className:'agg-body'},
+          // Impact badge
+          impact&&lvl!=='none'&&h('div',{style:{fontSize:11,fontWeight:700,color:lvl==='direct'?'#C62828':'#7A5000'}},
+            lvl==='direct'?'🔴 Directly impacted by requirement':'🟡 Indirectly affected'
+          ),
+          // Lifecycle
+          t.lifecycle&&t.lifecycle.length>0&&h('div',null,
+            h('div',{className:'agg-lbl'},'Lifecycle'),
+            h('div',{className:'agg-lifecycle'},
+              t.lifecycle.map((s,j)=>[
+                h('span',{key:s,className:'agg-ls'},s),
+                j<t.lifecycle.length-1&&h('span',{key:s+'-a',className:'agg-arr'},'→')
+              ]).flat().filter(Boolean)
+            )
+          ),
+          // Value objects
+          t.valueObjects&&t.valueObjects.length>0&&h('div',null,
+            h('div',{className:'agg-lbl'},'Value Objects'),
+            h('div',{className:'agg-vos'},t.valueObjects.map(v=>h('span',{key:v,className:'agg-vo'},v)))
+          ),
+          // Invariants
+          t.invariants&&t.invariants.length>0&&h('div',null,
+            h('div',{className:'agg-lbl'},'Invariants'),
+            h('ul',{className:'agg-invs'},t.invariants.map((inv,j)=>h('li',{key:j},inv)))
+          ),
+          // Commands
+          t.commands&&t.commands.length>0&&h('div',null,
+            h('div',{className:'agg-lbl'},'Commands → Events'),
+            h('table',{className:'agg-cmds'},
+              h('tbody',null,t.commands.map((c,j)=>h('tr',{key:j},
+                h('td',null,c.cmd),h('td',null,'→'),h('td',null,c.event)
+              )))
+            )
+          )
+        )
+      );
+    })
+  );
+}
+
+// ── GAP ANALYSIS ───────────────────────────────────────
+const CAT_CLS={
+  'Layer violation':'layer','Anemic model':'anemic','Missing concept':'missing',
+  'Infra coupling':'infra','Layer':'layer','Anemic':'anemic'
+};
+function GapAnalysis({gaps,workflows}){
+  // Derive gaps from workflow violations if no explicit gapAnalysis
+  const derived=gaps||(workflows||[]).flatMap((wf,wi)=>
+    (wf.steps||[]).filter(s=>s.type==='violation').map((s,si)=>({
+      id:`${wi}-${si}`,title:s.label,detail:`In workflow: ${wf.name}`,
+      file:'',severity:'P0',category:'Layer violation'
+    }))
+  );
+  if(!derived.length)return h('div',{className:'empty'},'No violations found — domain model looks healthy.');
+
+  const counts={P0:derived.filter(g=>g.severity==='P0').length,P1:derived.filter(g=>g.severity==='P1').length,P2:derived.filter(g=>g.severity==='P2').length};
+  const catCls=cat=>{const k=Object.keys(CAT_CLS).find(k=>cat.toLowerCase().includes(k.toLowerCase()));return CAT_CLS[k]||'layer';};
+
+  return h('div',null,
+    h('div',{className:'gap-summary'},
+      counts.P0>0&&h('span',{className:'gap-chip p0'},`🔴 ${counts.P0} P0 — Fundamental`),
+      counts.P1>0&&h('span',{className:'gap-chip p1'},`🟡 ${counts.P1} P1 — Structural`),
+      counts.P2>0&&h('span',{className:'gap-chip p2'},`🟢 ${counts.P2} P2 — Improvement`)
+    ),
+    h('table',{className:'gap-table'},
+      h('thead',null,h('tr',null,
+        h('th',null,'#'),h('th',null,'Violation'),h('th',null,'Detail'),
+        h('th',null,'File'),h('th',null,'Sev'),h('th',null,'Category')
+      )),
+      h('tbody',null,derived.map((g,i)=>h('tr',{key:g.id||i},
+        h('td',null,g.id||i+1),
+        h('td',null,h('strong',null,g.title)),
+        h('td',{style:{color:'#5B6F8A',maxWidth:260}},g.detail),
+        h('td',null,g.file?h('code',{style:{fontSize:10,background:'#F4F7FC',padding:'1px 5px',borderRadius:3,fontFamily:'monospace'}},g.file):'—'),
+        h('td',null,h('span',{className:`sev ${g.severity}`},
+          g.severity==='P0'?'🔴 P0':g.severity==='P1'?'🟡 P1':'🟢 P2'
+        )),
+        h('td',null,h('span',{className:`cat-pill ${catCls(g.category)}`},g.category))
+      )))
+    )
+  );
+}
+
+// ── ANALYZE PANEL ─────────────────────────────────────
+function AnalyzePanel({onClose,onDone}){
+  const[mode,setMode]=useState('url'); // 'url' | 'local'
+  const[url,setUrl]=useState('');
+  const[dir,setDir]=useState('');
+  const[out,setOut]=useState('');
+  const[maxDomains,setMaxDomains]=useState(0); // 0 = no limit
+  const[pickedFiles,setPickedFiles]=useState(null);
+  const[folderName,setFolderName]=useState('');
+  const[jobId,setJobId]=useState(null);
+  const[status,setStatus]=useState('idle');
+  const[logs,setLogs]=useState([]);
+  const[service,setService]=useState('');
+  const[err,setErr]=useState(null);
+  const logRef=useRef(null);
+  const fileInputRef=useRef(null);
+
+  useEffect(()=>{if(logRef.current)logRef.current.scrollTop=logRef.current.scrollHeight;},[logs]);
+
+  useEffect(()=>{
+    if(!jobId||status!=='running')return;
+    const iv=setInterval(async()=>{
+      try{
+        const r=await fetch(`${API}/api/jobs/${jobId}`);
+        const d=await r.json();
+        setLogs(d.logs||[]);
+        if(d.status==='done'){setStatus('done');setService(d.service);clearInterval(iv);}
+        else if(d.status==='error'){setStatus('error');setErr(d.error||'Analysis failed');clearInterval(iv);}
+      }catch{setStatus('error');setErr('Lost connection');clearInterval(iv);}
+    },800);
+    return()=>clearInterval(iv);
+  },[jobId,status]);
+
+  const onFilesPicked=e=>{
+    const all=[...e.target.files].filter(f=>f.name.endsWith('.cs'));
+    if(!all.length)return;
+    const folder=all[0].webkitRelativePath.split('/')[0];
+    setPickedFiles(all);
+    setFolderName(folder);
+    setDir('');
+    if(!out)setOut(folder);
+  };
+
+  const clearPick=()=>{
+    setPickedFiles(null);setFolderName('');
+    if(fileInputRef.current)fileInputRef.current.value='';
+  };
+
+  const canSubmit=status!=='running'&&(mode==='url'?url.trim():(pickedFiles||dir.trim()));
+
+  const resetForm=()=>{setStatus('idle');setLogs([]);setErr(null);setJobId(null);};
+  const switchMode=m=>{setMode(m);resetForm();};
+
+  const submit=async e=>{
+    e.preventDefault();
+    if(!canSubmit)return;
+    setStatus('running');setLogs([]);setErr(null);
+
+    if(mode==='url'){
+      // GitHub URL mode: POST to /api/discover
+      const r=await fetch(`${API}/api/discover`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url.trim(),out:out.trim()||undefined,maxDomains:maxDomains||undefined})});
+      const d=await r.json();
+      if(!r.ok){setStatus('error');setErr(d.error);return;}
+      setJobId(d.jobId);setService(d.service);
+    } else if(pickedFiles){
+      // Folder picker upload mode
+      setLogs([`📂 Reading ${pickedFiles.length} .cs files from "${folderName}"…`]);
+      const fileData=await Promise.all(pickedFiles.map(async f=>({path:f.webkitRelativePath,content:await f.text()})));
+      setLogs(l=>[...l,`⬆️  Uploading ${fileData.length} files…`]);
+      const r=await fetch(`${API}/api/analyze-upload`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({out:out.trim()||folderName,files:fileData})});
+      const d=await r.json();
+      if(!r.ok){setStatus('error');setErr(d.error);return;}
+      setJobId(d.jobId);setService(d.service);
+    } else {
+      // Manual path mode
+      const r=await fetch(`${API}/api/jobs`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:dir.trim(),out:out.trim()||undefined,maxDomains:maxDomains||undefined})});
+      const d=await r.json();
+      if(!r.ok){setStatus('error');setErr(d.error);return;}
+      setJobId(d.jobId);setService(d.service);
+    }
+  };
+
+  return h('div',{className:'ap-overlay',onClick:e=>{if(e.target===e.currentTarget)onClose();}},
+    h('div',{className:'ap-panel'},
+      h('div',{className:'ap-hdr'},
+        h('span',{className:'ap-title'},'🔍 Analyze a Service Repo'),
+        h('button',{className:'ap-close',onClick:onClose},'✕')
+      ),
+      h('form',{className:'ap-form',onSubmit:submit},
+
+        // Mode toggle
+        h('div',{className:'ap-mode'},
+          h('button',{type:'button',className:`ap-mode-btn url${mode==='url'?' active':''}`,onClick:()=>switchMode('url')},'🔗 GitHub URL'),
+          h('button',{type:'button',className:`ap-mode-btn${mode==='local'?' active':''}`,onClick:()=>switchMode('local')},'📁 Local directory')
+        ),
+
+        // Hidden folder input (local mode)
+        h('input',{type:'file',ref:fileInputRef,style:{display:'none'},webkitdirectory:'',directory:'',multiple:true,onChange:onFilesPicked}),
+
+        // GitHub URL mode
+        mode==='url'&&h('label',{className:'ap-label'},'GitHub repository URL',
+          h('input',{className:'ap-input',placeholder:'https://github.com/seismic/channel-service',value:url,onChange:e=>setUrl(e.target.value),disabled:status==='running',autoFocus:true}),
+          h('span',{className:'ap-hint'},'Clones the repo and runs a full DDD analysis — requires gh auth')
+        ),
+
+        // Local directory mode
+        mode==='local'&&h('label',{className:'ap-label'},'Repo directory',
+          pickedFiles
+            ?h('div',null,
+                h('div',{className:'ap-folder-tag'},
+                  '📁 ',h('span',null,folderName),
+                  h('span',{style:{color:'#6B7280',marginLeft:4}},`(${pickedFiles.length} .cs files)`),
+                  h('button',{type:'button',onClick:clearPick,title:'Clear'},'✕')
+                )
+              )
+            :h('div',{className:'ap-path-row'},
+                h('input',{className:'ap-input',placeholder:'/path/to/service-repo',value:dir,onChange:e=>setDir(e.target.value),disabled:status==='running'}),
+                h('button',{type:'button',className:'ap-pick-btn',disabled:status==='running',onClick:()=>fileInputRef.current?.click()},'📁 Browse')
+              )
+        ),
+
+        h('label',{className:'ap-label'},
+          h('span',null,'Output name ',h('span',{className:'ap-optional'},'(optional)')),
+          h('input',{className:'ap-input',placeholder:`defaults to ${mode==='url'?'repo name':'folder name'}`,value:out,onChange:e=>setOut(e.target.value),disabled:status==='running'})
+        ),
+
+        // Domain count control
+        h('div',{style:{display:'flex',flexDirection:'column',gap:4}},
+          h('span',{style:{fontSize:12,fontWeight:600,color:'#5B6F8A'}},
+            'Analysis depth',
+            h('span',{style:{fontWeight:400,color:'#9AA7B4',marginLeft:4}},
+              maxDomains>0?`— ${maxDomains} domains max`:'— auto (Claude decides)')
+          ),
+          h('div',{style:{display:'flex',gap:6,flexWrap:'wrap'}},
+            [{label:'Auto',val:0,hint:'Let Claude decide (typically 6–12)'},{label:'High-level',val:5,hint:'5 broad domains — fast overview'},{label:'Standard',val:10,hint:'10 domains — balanced detail'},{label:'Granular',val:20,hint:'20 domains — fine-grained'}]
+              .map(opt=>h('button',{
+                key:opt.val,type:'button',
+                title:opt.hint,
+                disabled:status==='running',
+                onClick:()=>setMaxDomains(opt.val),
+                style:{
+                  padding:'4px 12px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',
+                  border:'1.5px solid '+(maxDomains===opt.val?'#F15A24':'#D0DCF0'),
+                  background:maxDomains===opt.val?'#FFF0E8':'#F8F9FA',
+                  color:maxDomains===opt.val?'#C04A1A':'#5B6F8A',
+                  transition:'all .15s',
+                }
+              },opt.label))
+          )
+        ),
+
+        h('button',{className:'ap-submit',type:'submit',disabled:!canSubmit},
+          status==='running'?'⏳ Analyzing…':mode==='url'?'Analyze from URL':'Run Analysis')
+      ),
+
+      (logs.length>0||status!=='idle')&&h('div',{className:'ap-log-wrap'},
+        h('div',{className:'ap-log-title'},
+          status==='running'&&h('span',{className:'ap-pulse'}),
+          status==='running'?'Running…':status==='done'?'✅ Done':'❌ Failed'
+        ),
+        h('div',{className:'ap-log',ref:logRef},
+          ...logs.map((line,i)=>h('div',{key:i,className:'ap-log-line'},line)),
+          status==='running'&&h('div',{className:'ap-log-cursor'},'▌')
+        )
+      ),
+      status==='error'&&err&&h('div',{className:'ap-error'},'⚠ ',err),
+      status==='done'&&h('div',{className:'ap-done'},
+        h('span',null,'Service ',h('code',null,service),' is ready.'),
+        h('button',{className:'ap-load-btn',onClick:()=>{onDone(service);onClose();}},'Load into Studio →')
+      )
+    )
+  );
+}
+
 // ── APP ───────────────────────────────────────────────
 function App(){
+  const[services,setServices]=useState([]);
+  const[activeSvc,setActiveSvc]=useState('');
   const[data,setData]=useState(null);
   const[impact,setImpact]=useState(null);
   const[selDomain,setSelDomain]=useState(null);
+  const[selAgg,setSelAgg]=useState(null);
   const[selWf,setSelWf]=useState(null);
-  const[view,setView]=useState('current'); // 'current' | 'refactor'
+  const[view,setView]=useState('current'); // 'current' | 'ddd' | 'gap'
   const[loading,setLoading]=useState(true);
+  const[showAnalyze,setShowAnalyze]=useState(false);
+  const[impactLoading,setImpactLoading]=useState(false);
+
+  const loadService=async name=>{
+    setLoading(true);setImpact(null);setSelDomain(null);setSelAgg(null);setSelWf(null);
+    const r=await fetch(`${API}/api/analyze/${name}`);
+    setData(await r.json());
+    setActiveSvc(name);
+    setLoading(false);
+  };
+
+  const refreshServices=async()=>{
+    const r=await fetch(`${API}/api/services`);
+    const list=await r.json();
+    setServices(list);
+    return list;
+  };
 
   useEffect(()=>{
-    fetch(`${API}/api/analyze/content-manager-service`)
-      .then(r=>r.json()).then(d=>{setData(d);setLoading(false);})
-      .catch(()=>setLoading(false));
+    refreshServices().then(list=>{
+      if(list.length>0)loadService(list[0]);
+      else setLoading(false);
+    }).catch(()=>setLoading(false));
   },[]);
 
   const handleImpact=async req=>{
-    if(!req.trim()){setImpact(null);return;}
-    const r=await fetch(`${API}/api/impact`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:'content-manager-service',requirement:req})});
-    setImpact(await r.json());
+    if(!req.trim()||!activeSvc){setImpact(null);window._impactEngine=null;return;}
+    setImpactLoading(true);
+    try{
+      const r=await fetch(`${API}/api/impact`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:activeSvc,requirement:req})});
+      const d=await r.json();
+      window._impactEngine=d.engine||null;
+      setImpact(d);
+    }finally{
+      setImpactLoading(false);
+    }
   };
 
-  if(loading)return h('div',{className:'loading'},h('div',{className:'spinner'}),h('p',null,'Analysing service…'));
-  if(!data)return h('div',{className:'loading'},h('p',null,'Run: node backend/server.js'));
+  const handleAnalyzeDone=async svc=>{
+    const list=await refreshServices();
+    loadService(list.includes(svc)?svc:list[0]);
+  };
 
-  const counts=impact?{
+  if(loading&&!data)return h('div',{className:'loading'},h('div',{className:'spinner'}),h('p',null,'Loading service…'));
+  if(!data&&!loading)return h('div',null,
+    h('div',{className:'loading'},
+      h('p',null,'No services found.'),
+      h('button',{className:'analyze-btn',style:{marginTop:16},onClick:()=>setShowAnalyze(true)},'+ Analyze a service repo')
+    ),
+    showAnalyze&&h(AnalyzePanel,{onClose:()=>setShowAnalyze(false),onDone:handleAnalyzeDone})
+  );
+
+  const counts=impact&&data?{
     direct:data.domains.filter(d=>impact.domainScores[d.id]?.level==='direct').length,
     indirect:data.domains.filter(d=>impact.domainScores[d.id]?.level==='indirect').length,
     none:data.domains.filter(d=>(impact.domainScores[d.id]?.level??'none')==='none').length
@@ -406,38 +1300,101 @@ function App(){
 
   const selectedDomain=selDomain?data.domains.find(d=>d.id===selDomain):null;
 
+  // Derive violations: explicit gapAnalysis field OR from workflow violation steps
+  const gaps=data?.gapAnalysis||(data?.workflows||[]).flatMap((wf,wi)=>
+    (wf.steps||[]).filter(s=>s.type==='violation').map((s,si)=>({
+      id:`${wi}-${si}`,title:s.label,detail:`In workflow: ${wf.name}`,
+      file:'',severity:'P0',category:'Layer violation'
+    }))
+  );
+  const p0Count=gaps.filter(g=>g.severity==='P0').length;
+  const totalViolations=gaps.filter(g=>g.severity!=='P2').length;
+
+  // Domain card violation map: domainId → highest severity
+  const domainViolations={};
+  (data?.gapAnalysis||[]).forEach(g=>{
+    // match violation to domain by keyword
+    data.domains.forEach(d=>{
+      if(g.file&&g.file.toLowerCase().includes(d.name.replace(/ /g,'').toLowerCase().slice(0,6))){
+        const cur=domainViolations[d.id];
+        if(!cur||(g.severity==='P0'&&cur!=='P0')||(g.severity==='P1'&&cur==='P2'))
+          domainViolations[d.id]=g.severity;
+      }
+    });
+  });
+
   return h('div',null,
     // Header
     h('header',{className:'hdr'},
       h('div',{className:'hdr-l'},
         h('div',{className:'logo-s'},'S'),
         h('span',{className:'logo-txt'},'DomainCompose Studio'),
-        h('span',{className:'svc-badge'},data.service)
+        services.length>1&&h('select',{className:'svc-select',value:activeSvc,onChange:e=>loadService(e.target.value)},
+          services.map(s=>h('option',{key:s,value:s},s))
+        ),
+        services.length===1&&h('span',{className:'svc-badge'},activeSvc)
       ),
       h('div',{className:'view-toggle'},
         h('button',{className:`vt-btn${view==='current'?' active':''}`,onClick:()=>setView('current')},'📄 Domain Map'),
-        h('button',{className:`vt-btn refactor${view==='refactor'?' active':''}`,onClick:()=>setView('refactor')},'🔧 Refactor Target')
+        h('button',{className:`vt-btn refactor${view==='ddd'?' active':''}`,onClick:()=>setView('ddd')},'🔷 DDD Target'),
+        h('button',{className:`vt-btn gap${view==='gap'?' active':''}`,onClick:()=>setView('gap')},
+          '⚠ Gap Analysis',
+          totalViolations>0&&h('span',{className:'gap-count'},totalViolations)
+        )
       ),
-      h('div',{className:'hdr-r'},`Analysed ${data.analyzedAt}`)
+      h('div',{className:'hdr-r'},
+        data&&h('span',{className:'hdr-meta'},`Analysed ${data.analyzedAt}`),
+        h('button',{className:'analyze-btn',onClick:()=>setShowAnalyze(true)},'+ Analyze repo')
+      )
     ),
 
-    // Impact bar
-    h(ImpactBar,{onSearch:handleImpact,counts}),
+    // Impact bar (only on domain map and ddd views)
+    view!=='gap'&&h(ImpactBar,{onSearch:handleImpact,counts,loading:impactLoading}),
 
     // Main layout
-    h('div',{className:'layout'},
-      h(Sidebar,{domains:data.domains,selected:selDomain,onSelect:id=>{setSelDomain(id);setSelWf(null);},impact}),
+    data&&h('div',{className:'layout'},
+      // Sidebar hidden on gap view
+      view!=='gap'&&h(Sidebar,{
+        domains:data.domains,
+        selected:view==='ddd'?selAgg:selDomain,
+        onSelect:view==='ddd'
+          ?agg=>{setSelAgg(agg);if(agg)setTimeout(()=>{const el=document.getElementById('agg-'+agg);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},50);}
+          :id=>{setSelDomain(id);setSelWf(null);},
+        impact,view
+      }),
 
       h('main',{className:'content'},
-        // Domain detail panel when a domain is selected
-        selectedDomain&&h(DomainDetail,{domain:selectedDomain,impact,onClose:()=>setSelDomain(null)}),
-
-        // Current view
+        // Domain Map view
         view==='current'&&h('div',null,
+          selectedDomain&&h(DomainDetail,{domain:selectedDomain,impact,onClose:()=>setSelDomain(null)}),
           h('div',{className:'sec-title'},selDomain?`${selectedDomain?.name} — Domains`:'All Domains'),
-          h(DomainGrid,{domains:selDomain?data.domains.filter(d=>d.id===selDomain):data.domains,impact,selected:selDomain,onSelect:setSelDomain}),
+          // Domain cards with violation badges
+          h('div',{className:'domain-grid'},
+            (selDomain?data.domains.filter(d=>d.id===selDomain):data.domains).map(d=>{
+              const score=impact?.domainScores[d.id];
+              const lvl=score?.level??'none';
+              const reason=score?.reason||'';
+              const vio=domainViolations[d.id]||( d.health==='anemic'?'P1':null);
+              const cls=['dc',impact?`d-${lvl}`:'',selDomain===d.id?'selected':''].filter(Boolean).join(' ');
+              return h('div',{key:d.id,className:cls,onClick:()=>setSelDomain(d.id===selDomain?null:d.id)},
+                h('div',{className:'dc-hdr'},
+                  h('span',{className:'dc-icon'},d.icon),
+                  h('span',{className:'dc-name'},d.name),
+                  impact&&lvl!=='none'&&h('span',{className:`dc-ibadge ${lvl}`},lvl==='direct'?'🔴 Direct':'🟡 Indirect'),
+                  vio&&!impact&&h('span',{className:`vio-badge ${vio}`},vio)
+                ),
+                h('div',{className:'dc-health'},HEALTH_LABEL[d.health]),
+                // Show Claude's reason when impact is active
+                impact&&lvl!=='none'&&reason&&h('div',{style:{fontSize:10,color:lvl==='direct'?'#C62828':'#7A5000',marginBottom:4,lineHeight:1.4,fontStyle:'italic'}},reason),
+                h('ul',{className:'dc-ops'},
+                  d.operations.slice(0,3).map(op=>h('li',{key:op,className:(score?.matchedOps||[]).includes(op)?'op-hit':''},op)),
+                  d.operations.length>3&&h('li',{key:'more',className:'op-more'},`+${d.operations.length-3} more`)
+                )
+              );
+            })
+          ),
           h('div',{className:'sec-title',style:{marginTop:28}},selDomain?`${selectedDomain?.name} — Workflows`:'Key Workflows'),
-          h(WorkflowPanel,{workflows:data.workflows,impact,selected:selWf,onSelect:setSelWf,filterDomainId:selDomain}),
+          h(WorkflowPanel,{workflows:data.workflows,impact:impact?{...impact,workflowImpacts:impact.workflowImpacts}:null,selected:selWf,onSelect:setSelWf,filterDomainId:selDomain}),
           !selDomain&&h('div',null,
             h('div',{className:'sec-title',style:{marginTop:28}},'External Integrations'),
             h('div',{className:'int-grid'},
@@ -447,13 +1404,27 @@ function App(){
           )
         ),
 
-        // Refactor view
-        view==='refactor'&&h('div',null,
-          h('div',{className:'sec-title'},selDomain?`${selectedDomain?.name} — DDD Target`:'DDD Target Design — All Domains'),
-          h(RefactorGrid,{domains:data.domains,selected:selDomain,onSelect:setSelDomain,filterDomainId:selDomain})
+        // DDD Target view
+        view==='ddd'&&h('div',null,
+          h(AggregateDiagram,{data,highlightId:selAgg}),
+          data.boundedContext&&h('div',null,
+            h('div',{className:'sec-title'},'Bounded Context'),
+            h(BoundedContextPanel,{bc:data.boundedContext})
+          ),
+          h('div',{className:'sec-title'},selAgg?`${selAgg} — Aggregate Model`:'Aggregate Models'),
+          h(AggregateCards,{domains:selAgg?data.domains.filter(d=>d.dddTarget?.aggregate===selAgg):data.domains,impact})
+        ),
+
+        // Gap Analysis view
+        view==='gap'&&h('div',null,
+          h('div',{className:'sec-title'},'DDD Gap Analysis — content-manager-service'),
+          h(GapAnalysis,{gaps,workflows:data.workflows})
         )
       )
-    )
+    ),
+
+    // Analyze panel modal
+    showAnalyze&&h(AnalyzePanel,{onClose:()=>setShowAnalyze(false),onDone:handleAnalyzeDone})
   );
 }
 

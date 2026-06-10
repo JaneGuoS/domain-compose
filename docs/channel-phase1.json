@@ -1,0 +1,910 @@
+{
+  "service_name": "channel-service",
+  "analyzed_at": "2026-06-09",
+  "tech_stack": "C# / ASP.NET Core 8, PostgreSQL (Dapper/raw SQL via CMS layer), Redis (distributed cache), Kafka (Confluent), NewRelic APM",
+  "bounded_context": {
+    "owns": [
+      "Channel",
+      "Post",
+      "Comment",
+      "Reaction",
+      "Announcement",
+      "SocialStream",
+      "SocialContent",
+      "SocialShare",
+      "UserDetails",
+      "GenerativeAISettings",
+      "AIGeneratedPost",
+      "PeerToPeerContent (blob uploads)",
+      "UserAnnouncements",
+      "UserChannels"
+    ],
+    "depends_on": [
+      "CMS (Content Management Service — channel/post/comment/announcement/social persistence)",
+      "UMS (User Management Service — user lookup, groups, entitlements)",
+      "BSS (Blob Storage Service — upload URLs)",
+      "FMS (Feature Management Service — feature flags)",
+      "DAS (Data/Analytics Service — compliance config, analytics)",
+      "VFS (Video Function Service — video processing)",
+      "CAS (Content Action Service — rendition/SAS URL generation)",
+      "Notification Service (push notifications)",
+      "ProofPoint / ProofPoint Native (social compliance scanning)",
+      "SocialSharing Service (trigger actual social network posting)",
+      "Matrix (tenant lifecycle, region resolution)"
+    ],
+    "publishes_kafka": [
+      "eventbus.scp.content-management-application.ingested"
+    ],
+    "consumes_kafka": [
+      "eventbus.scp.content-function-services.rendition.updated",
+      "eventbus.scp.content-function-services.vfs.processed",
+      "eventbus.public.user-management.user"
+    ],
+    "http_deps": [
+      "CMS — primary persistence for all channel, post, comment, social entities via Cms3Manager/CMSServiceProvider",
+      "UMS — user identity, group membership, entitlement checks via UMSServiceProvider",
+      "BSS — blob upload SAS URLs via BSSServiceProvider",
+      "FMS — feature toggle reads via FMSServiceProvider",
+      "DAS — social compliance configuration and analytics data via DASServiceProvider",
+      "VFS — video upload and processing initiation via VFSServiceProvider",
+      "CAS — content SAS URL and rendition generation via CASServiceProvider",
+      "Notification Service — push notification delivery via NotificationServiceProvider",
+      "ProofPoint — social post compliance scanning via ProofPointServiceProvider",
+      "ProofPoint Native — native account deprovisioning via ProofPointNativeServiceProvider",
+      "SocialSharing Service — trigger cross-network social share posting via SocialSharingServiceProvider"
+    ],
+    "background_services": [
+      "NotificationEventConsumer — in-process queue consumer that builds and dispatches push notifications",
+      "UMSEventConsumer — Kafka consumer for user deactivated/deleted events; gates deprovision via FMS and DAS then calls ProofPoint Native to disable managed accounts",
+      "ContentVFSProcessedEventConsumer — Kafka consumer for VFS video-processed events; updates content thumbnails and blobs in CMS",
+      "ContentUpdatedEventConsumer — Kafka consumer for rendition-updated events (partially commented out)"
+    ]
+  },
+  "domains": [
+    {
+      "name": "channel",
+      "responsibility": "Manages the lifecycle and membership of Channel aggregates, including access-control rules, join/leave/request workflows, and visit tracking.",
+      "health": "good",
+      "health_reason": "ChannelEntity has rich constructors, enforces membership limits, AddRequest/GetRequest/RemoveRequest domain methods, CheckForNewPosts and AddOrUpdateUserVisit behaviours. PermissionEntity encapsulates all access-check logic. ChannelAppService correctly orchestrates via domain layer.",
+      "key_operations": [
+        "CreateChannelAsync",
+        "UpdateChannelPermissionAsync",
+        "JoinChannelAsync",
+        "LeaveChannelAsync",
+        "AddRequestAsync",
+        "ApproveAsync",
+        "DenyAsync",
+        "UpdateChannelVisitAsync",
+        "DeleteChannelAsync"
+      ],
+      "keywords": [
+        "ChannelEntity",
+        "PermissionEntity",
+        "MemberAccess",
+        "ChannelType",
+        "AccessType",
+        "RequestEntity"
+      ],
+      "aggregate": {
+        "class_name": "ChannelEntity",
+        "identity": "ChannelId (GUID)",
+        "lifecycle": [
+          "Created",
+          "MembersUpdated",
+          "VisitRecorded",
+          "Deleted"
+        ],
+        "value_objects": [
+          "PermissionEntity",
+          "UserVisit"
+        ],
+        "child_entities": [
+          "RequestEntity",
+          "MemberAccess"
+        ],
+        "invariants": [
+          "Channel type must be PUBLIC, AUTHORIZEDONLY, or PRIVATE",
+          "Member limit is 200",
+          "A user cannot have two PENDING requests for the same AccessType in the same channel",
+          "Only the channel creator can delete the channel",
+          "Only MANAGE-level members can update or delete permissions"
+        ],
+        "commands": [
+          {
+            "method": "AddRequest(userId, accessType)",
+            "raises": ""
+          },
+          {
+            "method": "AddOrUpdateUserVisit(userId)",
+            "raises": ""
+          },
+          {
+            "method": "RemoveRequest(requestId)",
+            "raises": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "post",
+      "responsibility": "Manages the lifecycle of short-form and draft posts, including featured status, reactions, and multi-channel publishing.",
+      "health": "good",
+      "health_reason": "PostEntity has typed constructors that enforce attachment type validation, Refill methods for content enrichment, and feature-date properties. Permission checks and notification dispatch are correctly deferred to the app service.",
+      "key_operations": [
+        "CreatePostAsync",
+        "UpdatePostAsync",
+        "DeletePostAsync",
+        "GetPostDetailAsync",
+        "FeaturePostAsync",
+        "UnFeaturePostAsync",
+        "AddReactionAsync",
+        "RemoveReactionAsync",
+        "GetDraftPostsAsync"
+      ],
+      "keywords": [
+        "PostEntity",
+        "PostType",
+        "PostRequest",
+        "AttachContentBase",
+        "IsFeatured",
+        "FeatureExpirationDate"
+      ],
+      "aggregate": {
+        "class_name": "PostEntity",
+        "identity": "PostId",
+        "lifecycle": [
+          "Draft",
+          "Published",
+          "Featured",
+          "Deleted"
+        ],
+        "value_objects": [
+          "ReactionEntity",
+          "AttachContentBase (LibraryContent, ProfileContent, WorkSpaceContent, PeerToPeerContent)"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "Only one draft post per user",
+          "Content attachment type must be a known ContentType enum value",
+          "Library and Profile content attachments require their respective extensions",
+          "Only MANAGE-level channel members can feature or delete another user's post",
+          "Maximum 4 overlapping featured items per time window per channel"
+        ],
+        "commands": [
+          {
+            "method": "AddAttachment(attachmentRequest)",
+            "raises": "DomainException"
+          },
+          {
+            "method": "Refill(contents, check)",
+            "raises": "DomainException if content not found"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comment",
+      "responsibility": "Manages threaded comments and reply trees on posts, including reactions and mention tracking.",
+      "health": "good",
+      "health_reason": "CommentEntity mirrors PostEntity patterns: typed constructors enforce status transitions (Created→Edited), attachment type validation, and Refill. ReactionEntity has pure Add/Remove/Contains behaviour.",
+      "key_operations": [
+        "CreateCommentAsync",
+        "UpdateCommentAsync",
+        "DeleteCommentAsync",
+        "AddReactionAsync",
+        "RemoveReactionAsync",
+        "GetReactionsByCommentIdAsync"
+      ],
+      "keywords": [
+        "CommentEntity",
+        "CommentStatus",
+        "ReactionEntity",
+        "MentionUser",
+        "ParentId",
+        "ReplyCount"
+      ],
+      "aggregate": {
+        "class_name": "CommentEntity",
+        "identity": "CommentId (GUID)",
+        "lifecycle": [
+          "Created",
+          "Edited",
+          "Deleted"
+        ],
+        "value_objects": [
+          "ReactionEntity",
+          "AttachContentBase",
+          "MentionUser"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "Comment body cannot be empty on creation",
+          "Attachment type must be a known ContentType",
+          "Reaction per user is unique (one reaction per user per comment)"
+        ],
+        "commands": [
+          {
+            "method": "AddAttachment(attachmentRequest)",
+            "raises": "DomainException"
+          },
+          {
+            "method": "Refill(contents, check)",
+            "raises": "DomainException if content not found"
+          }
+        ]
+      }
+    },
+    {
+      "name": "announcement",
+      "responsibility": "Manages time-bounded, multi-recipient announcements with draft/scheduled/published/expired lifecycle and notification dispatch.",
+      "health": "good",
+      "health_reason": "AnnouncementEntity has a computed PublishStatus property capturing the full state machine from IsDraft, PublishDate, and ExpireDate. AnnouncementPostEntity and AnnouncementSetting are proper value objects. DeepClone is present for safe notification dispatch.",
+      "key_operations": [
+        "CreateAnnouncementAsync",
+        "UpdateAnnouncementPostAsync",
+        "UpdateAnnouncementSettingAsync",
+        "DeleteAnnouncementAsync",
+        "GetUserAnnouncementsAsync",
+        "FeatureAnnouncementAsync"
+      ],
+      "keywords": [
+        "AnnouncementEntity",
+        "AnnouncementSetting",
+        "PublishStatus",
+        "RecipientType",
+        "IsDraft",
+        "ExpireDate"
+      ],
+      "aggregate": {
+        "class_name": "AnnouncementEntity",
+        "identity": "AnnouncementPost.PostId",
+        "lifecycle": [
+          "Unpublished",
+          "Scheduled",
+          "Published",
+          "Expired"
+        ],
+        "value_objects": [
+          "AnnouncementPostEntity",
+          "AnnouncementSetting"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "PublishDate must precede ExpireDate for a Published announcement",
+          "Notification is sent only if PublishStatus is Published at creation and recipients exist"
+        ],
+        "commands": [
+          {
+            "method": "constructor(userId, AnnouncementRequest)",
+            "raises": ""
+          },
+          {
+            "method": "constructor(userId, AnnouncementSettingRequest, origAnnouncement)",
+            "raises": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "social-stream",
+      "responsibility": "Manages Social Stream aggregates (curator-defined channels for social content), including membership, compliance settings, RSS feeds, and ordering.",
+      "health": "good",
+      "health_reason": "SocialStreamEntity has rich constructors merging update requests with originals, validates ChannelType to PUBLIC/PRIVATE only, and embeds PermissionEntity and ComplianceConfigurations as value objects.",
+      "key_operations": [
+        "CreateSocialStreamAsync",
+        "UpdateSocialStreamAsync",
+        "DeleteSocialStreamAsync",
+        "AddMemberToSocialStreamAsync",
+        "RemoveMemberFromSocialStreamAsync",
+        "ListSocialStreamsAsync"
+      ],
+      "keywords": [
+        "SocialStreamEntity",
+        "StreamType",
+        "ComplianceConfigurations",
+        "RssFeed",
+        "SocialNetworkSettings",
+        "IsMandatory",
+        "SearchFilters"
+      ],
+      "aggregate": {
+        "class_name": "SocialStreamEntity",
+        "identity": "ChannelId (GUID assigned by CMS)",
+        "lifecycle": [
+          "Active",
+          "Inactive",
+          "Deleted"
+        ],
+        "value_objects": [
+          "PermissionEntity",
+          "ComplianceConfigurations",
+          "SearchParameters",
+          "SocialNetworkSettings",
+          "RssFeed",
+          "InterestItemEntity"
+        ],
+        "child_entities": [
+          "RequestEntity"
+        ],
+        "invariants": [
+          "StreamType must be PUBLIC or PRIVATE",
+          "Stream name must be unique within tenant",
+          "Member limit inherited from PermissionEntity (200)"
+        ],
+        "commands": [
+          {
+            "method": "constructor(userId, SocialStreamRequest)",
+            "raises": "DomainException on invalid ChannelType"
+          },
+          {
+            "method": "constructor(userId, SocialStreamUpdateRequest, origStreamEntity)",
+            "raises": "DomainException on invalid ChannelType"
+          }
+        ]
+      }
+    },
+    {
+      "name": "social-content",
+      "responsibility": "Manages curator-authored social content items (posts intended for employee social sharing), including compliance state, content attachments, and AI usage metadata.",
+      "health": "partial",
+      "health_reason": "SocialContentEntity has constructors and Refill logic but carries raw compliance payload (full ContentResponse tree) as data bags rather than a proper ComplianceStatus value object, and lacks explicit state-transition methods.",
+      "key_operations": [
+        "CreateSocialContentAsync",
+        "BatchCreateSocialContentAsync",
+        "UpdateSocialContentAsync",
+        "PatchUpdateSocialContentAsync",
+        "DeleteSocialContentAsync",
+        "SearchSocialContentAsync"
+      ],
+      "keywords": [
+        "SocialContentEntity",
+        "ComplianceStatus",
+        "ContentViolations",
+        "SocialNetworkPermissions",
+        "StreamId",
+        "LegacyContentId"
+      ],
+      "aggregate": {
+        "class_name": "SocialContentEntity",
+        "identity": "PostId (GUID)",
+        "lifecycle": [
+          "Created",
+          "Updated",
+          "Deleted"
+        ],
+        "value_objects": [
+          "SocialNetworkSettings",
+          "LinkedInMention",
+          "ContentResponse",
+          "Violation"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "Language defaults to 'en' if not provided",
+          "Compliance data is optional but ComplianceStatus must be set if violations exist"
+        ],
+        "commands": [
+          {
+            "method": "AddAttachment(attachmentRequest)",
+            "raises": "DomainException"
+          },
+          {
+            "method": "Refill(contents, check)",
+            "raises": "DomainException if content not found"
+          }
+        ]
+      }
+    },
+    {
+      "name": "social-share",
+      "responsibility": "Manages the scheduled or posted social share lifecycle for an employee, including compliance checking, delegation, and social-network destinations.",
+      "health": "good",
+      "health_reason": "SocialShareEntity has rich constructors with merge semantics, ValidateDelegateFields enforces mutual-exclusivity invariant in-entity, RefillAttachments is on the entity, and all state transitions are clearly modelled via SocialShareStatus enum.",
+      "key_operations": [
+        "CreateSocialShareAsync",
+        "UpdateSocialShareAsync",
+        "PatchUpdateSocialShareAsync",
+        "DeleteSocialShareAsync",
+        "GetSocialSharesAsync",
+        "SearchSocialSharesAsync",
+        "SearchSocialSharesForDelegateAsync"
+      ],
+      "keywords": [
+        "SocialShareEntity",
+        "SocialShareStatus",
+        "DelegateInfo",
+        "DelegateHistory",
+        "ComplianceVendor",
+        "SocialNetworkDestinations",
+        "ScheduledTime"
+      ],
+      "aggregate": {
+        "class_name": "SocialShareEntity",
+        "identity": "Id (node ID from CMS)",
+        "lifecycle": [
+          "Draft",
+          "Scheduled",
+          "Queued",
+          "Posted",
+          "Failed",
+          "Retry",
+          "Recommended"
+        ],
+        "value_objects": [
+          "NetworkStatusInfo",
+          "ShareErrorDetails",
+          "DelegateInfo",
+          "SocialNetworkSettings",
+          "Violation",
+          "LinkedInMention"
+        ],
+        "child_entities": [
+          "DelegateHistory"
+        ],
+        "invariants": [
+          "DelegateRec and DelegateScheduled are mutually exclusive",
+          "ScheduledTime must be provided when Status is Scheduled",
+          "Schedule conflict: no two shares for the same advisor at the same time",
+          "Compliant is reset to 0 on creation to force re-evaluation"
+        ],
+        "commands": [
+          {
+            "method": "ValidateDelegateFields()",
+            "raises": "DomainException on mutual-exclusivity violation"
+          },
+          {
+            "method": "RefillAttachments(contentData, removeNotFound)",
+            "raises": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "user-details",
+      "responsibility": "Manages per-user social channel preferences, onboarding state, compliance opt-ins, and interest profiles.",
+      "health": "partial",
+      "health_reason": "UserDetailsEntity is a data container holding four optional sub-entities with no domain behaviour or invariants. Parsing is done via JObject deserialization in the constructor rather than typed methods. ExcludeFromCodeCoverage attribute signals neglect.",
+      "key_operations": [
+        "GetUserDetailsAsync",
+        "UpsertUserDetailsAsync"
+      ],
+      "keywords": [
+        "UserDetailsEntity",
+        "UserPreferenceDetailsEntity",
+        "UserOnboardingDetailsEntity",
+        "UserInterestDetailsEntity",
+        "UserComplianceDetailsEntity"
+      ],
+      "aggregate": {
+        "class_name": "UserDetailsEntity",
+        "identity": "UserId (GUID)",
+        "lifecycle": [
+          "Created",
+          "Updated"
+        ],
+        "value_objects": [
+          "UserPreferenceDetailsEntity",
+          "UserOnboardingDetailsEntity",
+          "UserInterestDetailsEntity",
+          "UserComplianceDetailsEntity"
+        ],
+        "child_entities": [],
+        "invariants": [],
+        "commands": []
+      }
+    },
+    {
+      "name": "generative-ai",
+      "responsibility": "Manages tenant-level generative AI settings and per-content AI-generated post caches for social sharing.",
+      "health": "anemic",
+      "health_reason": "GenerativeAISettingsEntity and AIGeneratedPostEntity are pure data bags with no domain behaviour, no invariants, and both are decorated with [ExcludeFromCodeCoverage]. All logic lives in the corresponding AppService and domain service.",
+      "key_operations": [
+        "GetGenerativeAISettingsAsync",
+        "UpsertGenerativeAISettingsAsync",
+        "GeneratePostAsync",
+        "BatchGeneratePostAsync",
+        "GetAIGeneratedPostAsync"
+      ],
+      "keywords": [
+        "GenerativeAISettingsEntity",
+        "AIGeneratedPostEntity",
+        "GenerativeAIStyleEntity",
+        "StyleEnforcementMode",
+        "AiGenerationEnabled",
+        "AiCommentUsage"
+      ],
+      "aggregate": {
+        "class_name": "GenerativeAISettingsEntity",
+        "identity": "Id (GUID)",
+        "lifecycle": [
+          "Created",
+          "Updated",
+          "Deleted"
+        ],
+        "value_objects": [
+          "GenerativeAIStyleEntity"
+        ],
+        "child_entities": [],
+        "invariants": [],
+        "commands": []
+      }
+    },
+    {
+      "name": "content",
+      "responsibility": "Manages PeerToPeer (user-uploaded) file content, including async video processing via Kafka and rendition generation via VFS/CAS.",
+      "health": "partial",
+      "health_reason": "ContentService contains business logic that directly resolves tenant context, spawns fire-and-forget Tasks with manual IServiceScopeFactory usage, duplicates the video format list, and has commented-out consumer code, indicating incomplete refactoring. No domain entity owns content invariants.",
+      "key_operations": [
+        "CreateContentAsync",
+        "DeleteContentAsync",
+        "GetContentAsync",
+        "UpdateContentAsync"
+      ],
+      "keywords": [
+        "PeerToPeerContent",
+        "ContentService",
+        "IVFSServiceProvider",
+        "IContentIngestedEventSender",
+        "RenditionSupportFormat"
+      ],
+      "aggregate": {
+        "class_name": "PeerToPeerContent",
+        "identity": "ContentId",
+        "lifecycle": [
+          "Created",
+          "ProcessingRequested",
+          "Processed",
+          "Deleted"
+        ],
+        "value_objects": [],
+        "child_entities": [],
+        "invariants": [
+          "Only rendition-supported formats trigger the VFS/Kafka pipeline"
+        ],
+        "commands": []
+      }
+    },
+    {
+      "name": "user-announcements",
+      "responsibility": "Aggregates announcements visible to a specific user by filtering channel, user, and group recipients.",
+      "health": "partial",
+      "health_reason": "UserAnnouncements has domain filtering logic in its constructor (recipient matching across channel/user/group) but is an anemic container with no further behaviour and no explicit lifecycle. UserAnnouncementsService delegates all persistence to the CMS.",
+      "key_operations": [
+        "GetUserAnnouncementsAsync",
+        "MarkAnnouncementReadAsync"
+      ],
+      "keywords": [
+        "UserAnnouncements",
+        "RecipientType",
+        "AnnouncementItems",
+        "GroupIds",
+        "UserChannelIds"
+      ],
+      "aggregate": {
+        "class_name": "UserAnnouncements",
+        "identity": "UserId",
+        "lifecycle": [
+          "Computed"
+        ],
+        "value_objects": [],
+        "child_entities": [
+          "AnnouncementEntity (filtered view)"
+        ],
+        "invariants": [
+          "Only announcements matching the user's channels, direct user ID, or group IDs are included"
+        ],
+        "commands": []
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "name": "Create Channel Post",
+      "domain_sequence": [
+        "channel",
+        "post",
+        "content"
+      ],
+      "steps": [
+        {
+          "label": "POST /channels/{channelId}/posts",
+          "type": "api"
+        },
+        {
+          "label": "PostAppService.CreatePostAsync — validate draft limit and permission",
+          "type": "domain"
+        },
+        {
+          "label": "UserChannelsService.GetUserChannelAsync — fetch channel membership",
+          "type": "domain"
+        },
+        {
+          "label": "PostEntity constructor — enforce attachment type rules",
+          "type": "domain"
+        },
+        {
+          "label": "PostService.CreatePostAsync — persist and update lastPostTime",
+          "type": "domain"
+        },
+        {
+          "label": "ICms3Manager.AddPostAsync (CMS HTTP call)",
+          "type": "external"
+        }
+      ],
+      "has_violations": false
+    },
+    {
+      "name": "Feature a Post",
+      "domain_sequence": [
+        "channel",
+        "post",
+        "items"
+      ],
+      "steps": [
+        {
+          "label": "POST /channels/{channelId}/posts/{postId}/feature",
+          "type": "api"
+        },
+        {
+          "label": "PostAppService.FeaturePostAsync — check MANAGE permission",
+          "type": "domain"
+        },
+        {
+          "label": "ItemsService.GetOverlappedFeaturedItemsByChannel — query overlap window",
+          "type": "domain"
+        },
+        {
+          "label": "ItemsService.ExceedsOverlapLimit — enforce 4-item invariant",
+          "type": "domain"
+        },
+        {
+          "label": "PostService.UpdatePostAsync (CMS)",
+          "type": "external"
+        },
+        {
+          "label": "NotificationEventDispatcher.Send — enqueue feature_post notification",
+          "type": "background"
+        }
+      ],
+      "has_violations": false
+    },
+    {
+      "name": "Approve Channel Join Request",
+      "domain_sequence": [
+        "channel"
+      ],
+      "steps": [
+        {
+          "label": "POST /channels/{channelId}/requests/{requestId}/approve",
+          "type": "api"
+        },
+        {
+          "label": "ChannelAppService.ApproveAsync — verify MANAGE permission",
+          "type": "domain"
+        },
+        {
+          "label": "ChannelEntity.GetRequest — retrieve in-memory request",
+          "type": "domain"
+        },
+        {
+          "label": "PermissionEntity.AddMember / UpdateMember — mutate in-memory permission",
+          "type": "domain"
+        },
+        {
+          "label": "ChannelService.AddMemberAsync / UpdateMemberAsync (CMS)",
+          "type": "external"
+        },
+        {
+          "label": "ChannelService.RemoveRequestAsync (CMS)",
+          "type": "external"
+        }
+      ],
+      "has_violations": false
+    },
+    {
+      "name": "Create Social Share with Compliance",
+      "domain_sequence": [
+        "social-stream",
+        "social-share"
+      ],
+      "steps": [
+        {
+          "label": "POST /social/shares",
+          "type": "api"
+        },
+        {
+          "label": "SocialShareAppService.CreateSocialShareAsync — validate schedule conflict, delegation",
+          "type": "domain"
+        },
+        {
+          "label": "SocialShareEntity constructor — enforce delegate mutual-exclusivity",
+          "type": "domain"
+        },
+        {
+          "label": "SocialShareService.CreateSocialShareAsync (CMS)",
+          "type": "external"
+        },
+        {
+          "label": "SocialShareAppService.TryProcessCreateSharingWithComplianceAsync — call ProofPoint or SocialSharing provider",
+          "type": "external"
+        },
+        {
+          "label": "SocialSharingServiceProvider.TriggerSharingAsync (if Posted)",
+          "type": "external"
+        }
+      ],
+      "has_violations": false
+    },
+    {
+      "name": "User Deprovisioning (UMS Kafka Event)",
+      "domain_sequence": [
+        "generative-ai",
+        "user-details"
+      ],
+      "steps": [
+        {
+          "label": "UMSEventConsumer.ExecuteAsync — receive Kafka message",
+          "type": "background"
+        },
+        {
+          "label": "UMSEventConsumer.IsSocialComplianceFeatureEnabledAsync — HTTP call to FMS inside background consumer",
+          "type": "violation"
+        },
+        {
+          "label": "UMSEventConsumer.GetDeprovisionAuthTokenAsync — HTTP call to DAS inside background consumer",
+          "type": "violation"
+        },
+        {
+          "label": "UMSEventConsumer.HandleUserDeprovisionAsync — HTTP call to UMS then ProofPoint Native",
+          "type": "external"
+        }
+      ],
+      "has_violations": true
+    },
+    {
+      "name": "PeerToPeer Content Upload (Video Processing)",
+      "domain_sequence": [
+        "content"
+      ],
+      "steps": [
+        {
+          "label": "POST /blob/upload",
+          "type": "api"
+        },
+        {
+          "label": "ContentAppService → ContentService.CreateContentAsync",
+          "type": "domain"
+        },
+        {
+          "label": "ICms3Manager.CreateContentAsync (CMS)",
+          "type": "external"
+        },
+        {
+          "label": "Fire-and-forget Task.Run — resolve tenant context from DI scope",
+          "type": "violation"
+        },
+        {
+          "label": "VFSServiceProvider.CreateVideoAsync (if video format)",
+          "type": "external"
+        },
+        {
+          "label": "IContentIngestedEventSender.SendToEventBus — publish Kafka event",
+          "type": "kafka"
+        },
+        {
+          "label": "ContentVFSProcessedEventConsumer — Kafka consumer updates CMS thumbnail",
+          "type": "background"
+        }
+      ],
+      "has_violations": true
+    },
+    {
+      "name": "Channel Permission Bulk Update to PUBLIC",
+      "domain_sequence": [
+        "channel"
+      ],
+      "steps": [
+        {
+          "label": "PATCH /channels/{channelId}/permissions",
+          "type": "api"
+        },
+        {
+          "label": "ChannelAppService.UpdateChannelPermissionAsync — parse and validate request",
+          "type": "domain"
+        },
+        {
+          "label": "PermissionEntity.BulkUpdate / AddMember mutations — in-memory",
+          "type": "domain"
+        },
+        {
+          "label": "ChannelService.AddMemberAsync / UpdateMemberAsync / RemoveRequestAsync — parallel CMS calls per pending request (potential N+1)",
+          "type": "violation"
+        },
+        {
+          "label": "Task.Run ReloadChannelsCache — fire-and-forget Redis invalidation",
+          "type": "background"
+        }
+      ],
+      "has_violations": true
+    }
+  ],
+  "gap_analysis": [
+    {
+      "title": "Infrastructure types leak into Domain layer",
+      "detail": "Multiple domain services (ContentService, UserService, UserChannelsService, UserAnnouncementsService, TimezoneResolver, AIGeneratedPostService, GenerativeAISettingsService) directly import and depend on Seismic.Channel.Infrastructure.Context (IContextProvider, ITraceProvider) and even NewRelic.Api.Agent ([Trace] attribute on ItemsService, ContentService). Infrastructure concerns like tracing, tenant resolution, and monitoring should not appear in the domain layer. This breaks Dependency Rule and makes domain logic untestable without the infrastructure stack.",
+      "file": "ContentService.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "title": "Application layer imports API model types",
+      "detail": "SocialShareAppService, SocialStreamAppService, and SocialContentAppService have 'using Seismic.Channel.Api.Models.Social' at the top. The application layer must not depend on the API (presentation) layer. This reversal of the dependency arrow means the API model changes will break application services, and the application services cannot be consumed by any other host without dragging in API models.",
+      "file": "SocialShareAppService.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "title": "UMSEventConsumer performs HTTP calls inline in background consumer",
+      "detail": "UMSEventConsumer.ProcessUserEventAsync directly calls IsSocialComplianceFeatureEnabledAsync (HTTP to FMS) and GetDeprovisionAuthTokenAsync (HTTP to DAS) inside the Kafka consume loop, bypassing the domain/application service boundary. Business rules about whether deprovision should proceed (feature flag gating, compliance auth-token validation) belong in a domain or application service, not in the infrastructure consumer.",
+      "file": "UMSEventConsumer.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "title": "ContentService uses IServiceScopeFactory for fire-and-forget tasks",
+      "detail": "ContentService (a domain service) directly receives and uses IServiceScopeFactory to create DI scopes for async Kafka publishing inside Task.Run. This is an infrastructure concern inside the domain. The fire-and-forget pattern also silently swallows errors, and the duplication of the video format list (defined twice in the same method) indicates copy-paste development. A proper domain event (ContentCreated) + infrastructure handler would eliminate this coupling.",
+      "file": "ContentService.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "title": "ICms3Manager exposes a god-interface spanning all aggregates",
+      "detail": "ICms3Manager has over 60 methods covering channels, posts, comments, announcements, social content, social shares, social streams, and content files. A single interface violation of Interface Segregation Principle — any domain service taking ICms3Manager can access persistence for aggregates it does not own. It should be split per aggregate (IChannelRepository, IPostRepository, etc.), and the 'manager' naming suggests an anti-pattern.",
+      "file": "ICms3Manager.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "title": "Anemic GenerativeAI and UserDetails entities",
+      "detail": "GenerativeAISettingsEntity, AIGeneratedPostEntity, and UserDetailsEntity are pure data bags with no invariants, no domain methods, and [ExcludeFromCodeCoverage] attributes. All business logic (AI style validation, user preference rules) is in AppService or domain service classes. These should be enriched with at least invariant guards and factory methods.",
+      "file": "GenerativeAISettingsEntity.cs",
+      "severity": "P1",
+      "category": "Anemic model"
+    },
+    {
+      "title": "Permission mutation logic leaks into ChannelAppService",
+      "detail": "ChannelAppService.UpdateChannelPermissionAsync performs direct mutations on PermissionEntity (permission.AddMember, permission.UpdateMember, permission.RemoveMember, permission.BulkUpdate) and then calls the channel service for each member change. This orchestration of permission invariants belongs inside ChannelEntity or PermissionEntity as aggregate methods, not scattered across a 270-line application service method.",
+      "file": "ChannelAppService.cs",
+      "severity": "P1",
+      "category": "Anemic model"
+    },
+    {
+      "title": "Post featurability invariant split across AppService and Entity",
+      "detail": "PostAppService.FeaturePostAsync directly sets post.IsFeatured, post.FeatureCreationTime, post.FeatureCreatedBy, post.FeatureStartDate, post.FeatureExpirationDate on the entity rather than calling a Feature() method on PostEntity. The 4-item overlap limit check is in ItemsService.ExceedsOverlapLimit rather than being expressed as a PostEntity invariant. The aggregate root should own Feature(featureRequest) with the invariant guard.",
+      "file": "PostAppService.cs",
+      "severity": "P2",
+      "category": "Anemic model"
+    },
+    {
+      "title": "Missing SocialCompliance domain concept",
+      "detail": "Compliance data (ComplianceStatus, Compliance, ContentViolations, Violations, ComplianceCheckLog) appears as raw properties in both SocialContentEntity and SocialShareEntity with no dedicated ComplianceStatus value object or SocialCompliance aggregate. Compliance logic is scattered across SocialShareAppService.TryProcessCreateSharingWithComplianceAsync, SocialDASComplianceService, and the UMSEventConsumer. A ComplianceStatus value object or ComplianceResult domain object would consolidate this.",
+      "file": "SocialShareEntity.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "title": "Commented-out ContentUpdated Kafka consumer indicates incomplete design",
+      "detail": "ContentUpdatedEventConsumer exists but is entirely commented out in ContentService.CreateContentAsync. IContentUpdatedEventConsumer interface remains in the domain. This dead code signals an incomplete migration away from synchronous content-update polling toward event-driven processing, leaving the design in a transitional state with unclear ownership.",
+      "file": "ContentService.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "title": "N+1 pattern in bulk channel permission update",
+      "detail": "ChannelAppService.UpdateChannelPermissionAsync iterates over channel.Requests and fires individual AddMemberAsync / UpdateMemberAsync / RemoveRequestAsync CMS HTTP calls per request, despite a Task.WhenAll wrapper. A batch CMS endpoint (AddMembersAsync exists on ICms3Manager but is not used here) should be used instead to avoid per-request HTTP round trips under load.",
+      "file": "ChannelAppService.cs",
+      "severity": "P2",
+      "category": "Infra coupling"
+    }
+  ]
+}

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Manager Service — Domain Workflow Map</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #1a1a2e; }
+
+  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; padding: 28px 36px; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .header .subtitle { font-size: 13px; color: #8892b0; margin-top: 4px; }
+  .badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge-red { background: #ff4757; color: #fff; }
+  .badge-amber { background: #ffa502; color: #fff; }
+  .badge-green { background: #2ed573; color: #1a1a2e; }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 28px 24px; }
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #8892b0; margin-bottom: 14px; }
+
+  .domains-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 36px; }
+  .domain-card { background: #fff; border-radius: 10px; border: 1.5px solid #e8ecf0; padding: 16px; transition: box-shadow 0.15s; }
+  .domain-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .domain-card.anemic { border-left: 4px solid #ff4757; }
+  .domain-card.partial { border-left: 4px solid #ffa502; }
+  .domain-card.good { border-left: 4px solid #2ed573; }
+
+  .domain-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .domain-icon { font-size: 20px; }
+  .domain-name { font-size: 14px; font-weight: 700; color: #1a1a2e; }
+  .health-badge { margin-left: auto; padding: 2px 8px; border-radius: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+  .health-anemic { background: #ffe0e3; color: #ff4757; }
+  .health-partial { background: #fff3cd; color: #d68910; }
+  .health-good { background: #d4f5e2; color: #1a8f4b; }
+
+  .domain-ops { list-style: none; margin-top: 6px; }
+  .domain-ops li { font-size: 11.5px; color: #5a6474; padding: 2px 0; display: flex; align-items: center; gap: 5px; }
+  .domain-ops li::before { content: '•'; color: #c0c7d0; font-size: 10px; }
+
+  .workflow-block { background: #fff; border-radius: 10px; border: 1.5px solid #e8ecf0; padding: 18px 20px; margin-bottom: 14px; }
+  .workflow-name { font-size: 13px; font-weight: 700; color: #1a1a2e; margin-bottom: 12px; }
+  .workflow-steps { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .step { padding: 5px 11px; border-radius: 16px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .step-api { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+  .step-domain { background: #fce4ec; color: #c62828; border: 1px solid #f8bbd0; }
+  .step-kafka { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; }
+  .step-background { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+  .step-external { background: #ede7f6; color: #4527a0; border: 1px solid #d1c4e9; }
+  .step-violation { background: #ffebee; color: #b71c1c; border: 2px dashed #ef9a9a; }
+  .step-arrow { color: #b0bec5; font-size: 14px; font-weight: 300; }
+
+  .integrations-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .integration-card { background: #fff; border-radius: 10px; border: 1.5px solid #e8ecf0; padding: 14px 16px; }
+  .integration-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+  .integration-title.kafka-in { color: #0277bd; }
+  .integration-title.kafka-out { color: #e65100; }
+  .integration-title.http { color: #6a1b9a; }
+  .integration-title.background { color: #2e7d32; }
+  .integration-item { font-size: 11.5px; color: #5a6474; padding: 3px 0; border-bottom: 1px solid #f0f2f5; display: flex; align-items: center; gap: 6px; }
+  .integration-item:last-child { border-bottom: none; }
+  .int-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dot-blue { background: #0277bd; }
+  .dot-orange { background: #e65100; }
+  .dot-purple { background: #6a1b9a; }
+  .dot-green { background: #2e7d32; }
+  .section-gap { margin-bottom: 32px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Content Manager Service — Domain Workflow Map</h1>
+  <div class="subtitle">Analyzed 2026-06-08 · .NET · 8 domains · multi-tenant SQL Server · Kafka event bus</div>
+  <div class="badges">
+    <span class="badge badge-red">3 P0 violations</span>
+    <span class="badge badge-amber">3 P1 violations</span>
+    <span class="badge badge-green">2 P2 improvements</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="section-gap">
+    <div class="section-title">Domains</div>
+    <div class="domains-grid">
+
+      <div class="domain-card anemic">
+        <div class="domain-header">
+          <span class="domain-icon">📁</span>
+          <span class="domain-name">File &amp; Content</span>
+          <span class="health-badge health-anemic">Anemic</span>
+        </div>
+        <ul class="domain-ops">
+          <li>Add / update / delete file</li>
+          <li>Get file &amp; file version</li>
+          <li>Patch partial update</li>
+          <li>Check out / check in</li>
+          <li>Bulk file operations</li>
+          <li>Shortcut management</li>
+          <li>URL mapping</li>
+        </ul>
+      </div>
+
+      <div class="domain-card anemic">
+        <div class="domain-header">
+          <span class="domain-icon">📂</span>
+          <span class="domain-name">Folder</span>
+          <span class="health-badge health-anemic">Anemic</span>
+        </div>
+        <ul class="domain-ops">
+          <li>Create / update / delete folder</li>
+          <li>Move folder</li>
+          <li>Get folder contents</li>
+          <li>Bulk folder operations</li>
+          <li>Folder hierarchy traversal</li>
+        </ul>
+      </div>
+
+      <div class="domain-card anemic">
+        <div class="domain-header">
+          <span class="domain-icon">📤</span>
+          <span class="domain-name">Publishing</span>
+          <span class="health-badge health-anemic">Anemic</span>
+        </div>
+        <ul class="domain-ops">
+          <li>Publish content item</li>
+          <li>Schedule publish</li>
+          <li>Simplified publish</li>
+          <li>Activate / deactivate</li>
+          <li>Promote content</li>
+          <li>Draft → published transition</li>
+        </ul>
+      </div>
+
+      <div class="domain-card partial">
+        <div class="domain-header">
+          <span class="domain-icon">🔒</span>
+          <span class="domain-name">Permissions</span>
+          <span class="health-badge health-partial">Partial</span>
+        </div>
+        <ul class="domain-ops">
+          <li>Get / set permissions</li>
+          <li>Unique permission management</li>
+          <li>Team site membership</li>
+          <li>Permission inheritance</li>
+          <li>Permission check / guard</li>
+        </ul>
+      </div>
+
+      <div class="domain-card anemic">
+        <div class="domain-header">
+          <span class="domain-icon">🔄</span>
+          <span class="domain-name">External Sync</span>
+          <span class="health-badge health-anemic">Anemic</span>
+        </div>
+        <ul class="domain-ops">
+          <li>Google Drive sync</li>
+          <li>OneDrive sync</li>
+          <li>ECM migration</li>
+          <li>Sync task management</li>
+          <li>Credential validation</li>
+          <li>Sync indicator tracking</li>
+        </ul>
+      </div>
+
+      <div class="domain-card partial">
+        <div class="domain-header">
+          <span class="domain-icon">⚙️</span>
+          <span class="domain-name">Content Processing</span>
+          <span class="health-badge health-partial">Partial</span>
+        </div>
+        <ul class="domain-ops">
+          <li>Rendition generation</li>
+          <li>Virus scanning</li>
+          <li>Document cracking (CCP)</li>
+          <li>AI/ML augmentation</li>
+          <li>Video processing (VFS)</li>
+          <li>Image processing</li>
+        </ul>
+      </div>
+
+      <div class="domain-card partial">
+        <div class="domain-header">
+          <span class="domain-icon">💬</span>
+          <span class="domain-name">Comments &amp; Annotations</span>
+          <span class="health-badge health-partial">Partial</span>
+        </div>
+        <ul class="domain-ops">
+          <li>Add / update / delete comment</li>
+          <li>Get comments for content</li>
+          <li>File annotation management</li>
+          <li>Ask expert</li>
+        </ul>
+      </div>
+
+      <div class="domain-card good">
+        <div class="domain-header">
+          <span class="domain-icon">🏷️</span>
+          <span class="domain-name">Custom Properties</span>
+          <span class="health-badge health-good">Good</span>
+        </div>
+        <ul class="domain-ops">
+          <li>Define custom properties</li>
+          <li>Set / update property values</li>
+          <li>Property type enforcement</li>
+          <li>Event-driven sync</li>
+          <li>Bulk property update</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-gap">
+    <div class="section-title">Key Workflows</div>
+
+    <div class="workflow-block">
+      <div class="workflow-name">Add File</div>
+      <div class="workflow-steps">
+        <span class="step step-api">POST /teamSites/{id}/files</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-violation">FileWriter (bypasses domain)</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-violation">IFileOrchestrator (business logic here)</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-external">IFileRepository.AddFile()</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-kafka">Kafka → content-event</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-kafka">Kafka → search.ingest</span>
+      </div>
+    </div>
+
+    <div class="workflow-block">
+      <div class="workflow-name">Publish Content</div>
+      <div class="workflow-steps">
+        <span class="step step-api">POST /publish</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-violation">IPublishOrchestrator (status logic inline)</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-violation">ItemModel.Status = "published" (no invariant)</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-external">Repository.UpdateAsync()</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-kafka">Kafka → content-event (Published)</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-background">NotificationService</span>
+      </div>
+    </div>
+
+    <div class="workflow-block">
+      <div class="workflow-name">External Content Sync (Google Drive / OneDrive)</div>
+      <div class="workflow-steps">
+        <span class="step step-api">POST /externalSync</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-domain">ExternalSyncService.SyncAsync()</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-external">IContentSyncClient (Google / OneDrive)</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-domain">IExternalSyncOrchestrator</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-external">IExternalSyncRepository.CreateTaskAsync()</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-background">SyncIndicatorBGService (polling)</span>
+      </div>
+    </div>
+
+    <div class="workflow-block">
+      <div class="workflow-name">Document Processing Pipeline (CCP → AI Augmentation)</div>
+      <div class="workflow-steps">
+        <span class="step step-kafka">Kafka ← eventbus.public.ccp.meta</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-background">CrackingPipelineMetaEventListener</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-background">AugmentationEventListener</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-domain">AI/ML Augmentation</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-external">COSClientProvider</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-kafka">Kafka → content-event (Processed)</span>
+      </div>
+    </div>
+
+    <div class="workflow-block">
+      <div class="workflow-name">Virus Scan &amp; Security Quarantine</div>
+      <div class="workflow-steps">
+        <span class="step step-kafka">Kafka ← blob-virus-scan.audit-trail</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-background">VirusScanEventListener</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-domain">IExpirationOrchestrator (quarantine logic)</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-external">Repository.UpdateStatusAsync()</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-background">NotificationService (alert owner)</span>
+      </div>
+    </div>
+
+    <div class="workflow-block">
+      <div class="workflow-name">Schedule Publish</div>
+      <div class="workflow-steps">
+        <span class="step step-api">POST /schedulePublish</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-domain">ILightSchduleJobOrchestrator</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-external">IItemRepository.CreateScheduleAsync()</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-background">RLPollingBackgroundService (timer)</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-domain">IPublishOrchestrator.ExecuteAsync()</span>
+        <span class="step-arrow">→</span>
+        <span class="step step-kafka">Kafka → content-event (Published)</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="section-gap">
+    <div class="section-title">External Integrations</div>
+    <div class="integrations-grid">
+
+      <div class="integration-card">
+        <div class="integration-title kafka-in">⬇ Kafka Consumed</div>
+        <div class="integration-item"><span class="int-dot dot-blue"></span>eventbus.public.ccp.meta</div>
+        <div class="integration-item"><span class="int-dot dot-blue"></span>eventbus.scp.vfs.processed</div>
+        <div class="integration-item"><span class="int-dot dot-blue"></span>eventbus.public.cms.custom-property</div>
+        <div class="integration-item"><span class="int-dot dot-blue"></span>eventbus.public.blob-virus-scan.audit-trail</div>
+        <div class="integration-item"><span class="int-dot dot-blue"></span>expiration-notification-setting (private)</div>
+      </div>
+
+      <div class="integration-card">
+        <div class="integration-title kafka-out">⬆ Kafka Published</div>
+        <div class="integration-item"><span class="int-dot dot-orange"></span>content-manager-service.content-event</div>
+        <div class="integration-item"><span class="int-dot dot-orange"></span>content-manager.webhook-event</div>
+        <div class="integration-item"><span class="int-dot dot-orange"></span>eventbus.public.search.ingest</div>
+      </div>
+
+      <div class="integration-card">
+        <div class="integration-title http">🌐 HTTP Providers</div>
+        <div class="integration-item"><span class="int-dot dot-purple"></span>UMS (User Management)</div>
+        <div class="integration-item"><span class="int-dot dot-purple"></span>COS (Content Object Store)</div>
+        <div class="integration-item"><span class="int-dot dot-purple"></span>Google Drive OAuth / API</div>
+        <div class="integration-item"><span class="int-dot dot-purple"></span>OneDrive / SharePoint API</div>
+        <div class="integration-item"><span class="int-dot dot-purple"></span>Profile Service API</div>
+        <div class="integration-item"><span class="int-dot dot-purple"></span>Notification Client</div>
+        <div class="integration-item"><span class="int-dot dot-purple"></span>Tiled (MicroApp)</div>
+      </div>
+
+      <div class="integration-card">
+        <div class="integration-title background">⚙ Background Services</div>
+        <div class="integration-item"><span class="int-dot dot-green"></span>RLPollingBackgroundService</div>
+        <div class="integration-item"><span class="int-dot dot-green"></span>SyncIndicatorBGService</div>
+        <div class="integration-item"><span class="int-dot dot-green"></span>ContentEventConsumer</div>
+        <div class="integration-item"><span class="int-dot dot-green"></span>CrackingPipelineMetaEventListener</div>
+        <div class="integration-item"><span class="int-dot dot-green"></span>VirusScanEventListener</div>
+        <div class="integration-item"><span class="int-dot dot-green"></span>AugmentationEventListener</div>
+        <div class="integration-item"><span class="int-dot dot-green"></span>VFSEventListener</div>
+        <div class="integration-item"><span class="int-dot dot-green"></span>CustomPropertyEventListener</div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
