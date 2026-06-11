@@ -522,15 +522,8 @@ grep -rn "public.*Task\|public.*Async" <repo>/src/<ApplicationProject> --include
 find <repo>/src -name "*Controller.cs" | grep -v test | xargs -I{} basename {} .cs | sort
 ```
 
-**Domain quality rules — these are hard constraints:**
-
-1. **Unique names**: Every domain must have a globally unique name. If two candidates share a name or differ only by a suffix (e.g. "File" and "FileVersion"), merge them into one domain (e.g. "File & Versioning") or rename them to clearly distinct names. Duplicate domain names are always wrong.
-2. **Full coverage**: Every `*Controller.cs` and `*AppService.cs` in the repo must map to exactly one domain. List which controllers and app services belong to each domain. If any are unaccounted for, either create a new domain or assign them to the closest existing one. Never omit a controller or app service.
-3. **One aggregate per domain**: Each domain has exactly one aggregate root. If a candidate domain would need two aggregate roots, split it into two domains with distinct names.
-
 For each domain area found, record:
-- **Name** (e.g. Channel, Post, Announcement) — must be unique across all domains
-- **Controllers / AppServices** — explicit list of source files that belong to this domain
+- **Name** (e.g. Channel, Post, Announcement)
 - **Operations** — list of user-facing actions derived from controller endpoints and app service methods
 - **Domain model health** — does it have an entity with invariant methods (rich) or just data properties (anemic)?
 

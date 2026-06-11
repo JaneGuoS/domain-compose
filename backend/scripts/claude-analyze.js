@@ -135,6 +135,29 @@ function extractJSON(text) {
   throw new Error('No valid JSON found in Claude output');
 }
 
+// ── Deduplicate domain IDs ────────────────────────────────────────────────────
+// If Phase 2 still produces duplicate IDs (e.g. "file" for both File and
+// FileVersion), append a numeric suffix to make every ID unique.
+function deduplicateDomainIds(studioJSON) {
+  const seen = {};
+  (studioJSON.domains || []).forEach(d => {
+    const base = d.id;
+    if (!seen[base]) {
+      seen[base] = 1;
+    } else {
+      seen[base]++;
+      const newId = `${base}-${seen[base]}`;
+      console.error(`  ⚠  Duplicate id "${base}" → renamed to "${newId}" (domain: ${d.name})`);
+      // Update workflow references too
+      (studioJSON.workflows || []).forEach(wf => {
+        wf.domains = (wf.domains || []).map(id => id === base ? newId : id);
+      });
+      d.id = newId;
+    }
+  });
+  return studioJSON;
+}
+
 // ── Merge new findings into an existing canonical JSON ────────────────────────
 // Keeps domain IDs and structure stable across runs.
 // New violations are additive; existing ones are updated if more detail is found.
@@ -242,6 +265,11 @@ CRITICAL — NON-INTERACTIVE MODE. Do NOT ask questions. Do NOT pause. Do NOT em
 Run --refactor --yes and complete the full analysis end-to-end.
 
 ${domainConstraint}
+
+DOMAIN QUALITY RULES — these are hard constraints, not guidelines:
+1. UNIQUE NAMES: Every domain must have a globally unique name. If two candidate domains share a name or differ only by a suffix (e.g. "File" and "FileVersion"), they MUST be merged into one domain (e.g. "File & Versioning") or renamed to clearly distinct names. Duplicate domain names are always wrong.
+2. FULL COVERAGE: Every Controller and AppService in the repo must map to exactly one domain. Before finalising the domain list, enumerate all *Controller.cs and *AppService.cs files and verify each is covered. If any are unaccounted for, either add a domain or assign them to the closest existing one. List which controllers/app services map to each domain in the key_operations field.
+3. ONE AGGREGATE PER DOMAIN: Each domain should have exactly one aggregate root. If a candidate domain would need two aggregate roots, it should be split into two domains (with distinct names).
 
 Output ONLY a single valid JSON object (no markdown, no prose) with this structure:
 {
@@ -358,7 +386,7 @@ function buildPhase2Prompt(phase1JSON) {
 You are a data normaliser. Convert the raw DDD analysis findings (Phase 1 JSON) into the exact Studio schema below.
 
 Rules:
-- domain id = kebab-case of domain name (e.g. "File & Content" → "file-content")
+- domain id = kebab-case of the FULL domain name — must be globally unique across all domains (e.g. "File" → "file", "FileVersion" → "file-version", "File & Content" → "file-content"). Never truncate or shorten in a way that duplicates another id.
 - workflow id = kebab-case of workflow name
 - health must be exactly "good", "partial", or "anemic"
 - severity must be exactly "P0", "P1", or "P2"
@@ -398,6 +426,49 @@ async function main() {
   try {
     phase1JSON = extractJSON(phase1Raw);
     console.error(`\n  ✅  Phase 1 complete — ${(phase1JSON.domains||[]).length} domains found`);
+
+    // ── Phase 1.5 — Validate domain quality before proceeding ───────────────
+    const p15Errors = [];
+    const p15Warnings = [];
+
+    // Check 1: duplicate names
+    const domainNames = (phase1JSON.domains||[]).map(d => (d.name||'').toLowerCase().trim());
+    const nameCounts = {};
+    domainNames.forEach(n => { nameCounts[n] = (nameCounts[n]||0) + 1; });
+    const dupeNames = Object.entries(nameCounts).filter(([,c])=>c>1).map(([n])=>n);
+    if (dupeNames.length > 0)
+      p15Errors.push(`Duplicate domain names: ${dupeNames.join(', ')} — Phase 1 must be re-run`);
+
+    // Check 2: coverage (only for local dir analysis)
+    if (DIR && fs.existsSync(path.resolve(DIR))) {
+      const { execSync } = require('child_process');
+      const countSrc = (pattern) => {
+        try {
+          return parseInt(execSync(
+            `find "${path.resolve(DIR)}" -name "${pattern}" ! -path "*/test*" ! -path "*/Test*" 2>/dev/null | wc -l`,
+            { encoding: 'utf8' }
+          ).trim(), 10) || 0;
+        } catch { return 0; }
+      };
+      const srcControllers = countSrc('*Controller.cs');
+      const srcAppServices = countSrc('*AppService.cs');
+      const found = (phase1JSON.domains||[]).length;
+      const signals = Math.max(srcControllers, srcAppServices);
+      if (signals > 0) {
+        const pct = Math.round((found / signals) * 100);
+        console.error(`  Coverage check: ${found} domains vs ${srcControllers} controllers / ${srcAppServices} app services (${pct}%)`);
+        if (pct < 60)
+          p15Warnings.push(`Low coverage (${pct}%) — only ${found} domains found for ${signals} controllers/services. Consider re-running without --max-domains.`);
+      }
+    }
+
+    if (p15Errors.length > 0) {
+      p15Errors.forEach(e => console.error(`  ❌  ${e}`));
+      console.error('\n  Phase 1.5 validation FAILED — aborting. Fix the analysis prompt or re-run.');
+      process.exit(1);
+    }
+    if (p15Warnings.length > 0)
+      p15Warnings.forEach(w => console.error(`  ⚠  ${w}`));
   } catch (err) {
     console.error(`\n❌  Phase 1 JSON parse error: ${err.message}`);
     // Save raw for debugging
@@ -454,6 +525,9 @@ async function main() {
     }
   }
 
+  // ── Deduplicate domain IDs ────────────────────────────────────────────────
+  studioJSON = deduplicateDomainIds(studioJSON);
+
   // ── Merge into existing canonical (if one exists) ────────────────────────
   studioJSON.service    = studioJSON.service    || serviceName;
   studioJSON.analyzedAt = studioJSON.analyzedAt || new Date().toISOString().slice(0, 10);
@@ -474,6 +548,37 @@ async function main() {
     }
   } else if (FRESH) {
     console.error('\n  --fresh flag: replacing canonical with new output');
+  }
+
+  // ── Coverage check ────────────────────────────────────────────────────────
+  // Count domain signals in the source repo and compare against found domains.
+  const repoRoot = DIR ? path.resolve(DIR) : null;
+  let coverageNote = '';
+  if (repoRoot && fs.existsSync(repoRoot)) {
+    try {
+      const { execSync } = require('child_process');
+      const countFiles = (pattern) => {
+        try {
+          return parseInt(execSync(
+            `find "${repoRoot}" -name "${pattern}" ! -path "*/test*" ! -path "*/Test*" ! -path "*node_modules*" 2>/dev/null | wc -l`,
+            { encoding: 'utf8' }
+          ).trim(), 10) || 0;
+        } catch { return 0; }
+      };
+      const controllers  = countFiles('*Controller.cs');
+      const appServices  = countFiles('*AppService.cs');
+      const entities     = countFiles('*Entity.cs');
+      const found        = (studioJSON.domains||[]).length;
+      const signals      = Math.max(controllers, appServices, entities);
+      const pct          = signals > 0 ? Math.round((found / signals) * 100) : '?';
+      coverageNote = `${found}/${signals} (${pct}% of ${controllers} controllers / ${appServices} app services / ${entities} entities)`;
+      studioJSON.coverageCheck = { found, controllers, appServices, entities, coveragePct: pct };
+      console.error(`\n   Coverage   : ${coverageNote}`);
+      if (typeof pct === 'number' && pct < 70)
+        console.error(`   ⚠  Low coverage — consider re-running with a higher --max-domains limit or without --max-domains`);
+    } catch (err) {
+      console.error(`   Coverage   : skipped (${err.message})`);
+    }
   }
 
   fs.writeFileSync(dataOutPath, JSON.stringify(studioJSON, null, 2));
