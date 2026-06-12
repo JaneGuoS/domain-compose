@@ -1,0 +1,1329 @@
+{
+  "service": "user-management-service",
+  "analyzedAt": "2026-06-11",
+  "boundedContext": {
+    "owns": [
+      "User identity lifecycle & tenant membership",
+      "Group hierarchy & membership",
+      "Smart group dynamic rule evaluation",
+      "Manager hierarchy & reporting tree",
+      "Custom property schema & validation",
+      "Delegation authority grants",
+      "Bulk import/export operations",
+      "SCIM 2.0 provisioning adapter",
+      "Identity provider sync configuration",
+      "People & directory search"
+    ],
+    "dependsOn": [
+      "AuthService — OAuth2 token validation and certificate-based client auth",
+      "JobManagementService — async bulk job orchestration",
+      "BlobStorageService — file uploads for bulk import/export",
+      "MatrixClient — Seismic platform service discovery",
+      "LaunchDarkly — feature flag evaluation"
+    ],
+    "publishes": [
+      "eventbus.public.ums.user-event",
+      "eventbus.public.ums.group-event",
+      "eventbus.public.ums.user-custom-property-event",
+      "eventbus.public.ums.group-member-event",
+      "eventbus.public.ums.user-full-model-event",
+      "eventbus.public.ums.group-full-model-event",
+      "eventbus.public.ums.user-custom-property-full-model-event",
+      "eventbus.public.ums.user-activity-event",
+      "eventbus.public.ums.user-sync-result-event"
+    ],
+    "consumes": [
+      "eventbus.public.ums.user-event",
+      "eventbus.public.ums.group-event",
+      "eventbus.public.ums.user-full-model-event",
+      "eventbus.public.ums.group-full-model-event",
+      "eventbus.public.auth.user-activity-event"
+    ]
+  },
+  "gapAnalysis": [
+    {
+      "id": 1,
+      "title": "Anemic User aggregate",
+      "detail": "User.cs contains only setter-level format guards (not-null, ShortGuid format check). All real business invariants — username and ssoId uniqueness (DefaultUserService.cs:752–758), XSS sanitisation of Organization/FirstName/LastName (lines 736–744), audit-field stamping, password initialisation, and custom-property defaulting (lines 614–690) — live in DefaultUserService. A DDD aggregate must protect its own consistency boundary without relying on the service layer to enforce rules.",
+      "file": "DefaultUserService.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 2,
+      "title": "Anemic Group aggregate",
+      "detail": "Group.cs is a pure data bag with no methods. Invariants — name uniqueness per tenant, Everyone-group mutation prevention, Smart-group rule validation — all live in GroupService (lines 90–160) and DefaultSmartGroupService. GroupService.CreateUserGroupAsync calls a repository to check uniqueness, then throws, with no participation from Group itself; the aggregate cannot protect its consistency in any other code path.",
+      "file": "GroupService.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 3,
+      "title": "Anemic User aggregate — 99K-line service",
+      "detail": "User.cs contains only data properties and no domain methods. All business rules (activation guards, group membership validation, duplicate detection, cache eviction) live in DefaultUserService.cs (~99K lines). For example, the invariant 'a deactivated user cannot be added to a group' is enforced by a guard clause in DefaultUserService.AddUserToGroupAsync, not by User.AssignToGroup(). Any future change to this invariant requires navigating the service monolith. The fix is to move invariant-enforcing methods onto User itself, reducing DefaultUserService to an orchestrator that calls aggregate methods and publishes events.",
+      "file": "DefaultUserService.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 4,
+      "title": "Anemic Group aggregate — 38K-line service",
+      "detail": "Group.cs is a data bag. GroupService.cs (~39K lines) contains all membership management, owner validation, and type-specific constraints (e.g., Everyone group is singleton, Smart groups cannot have direct members). The constraint 'Everyone group cannot have members added manually' is a service-layer if-check rather than an invariant on the Group aggregate. Moving type-specific behaviour into a GroupType strategy or into Group.AddMember()/Group.Create() would make violations impossible by construction.",
+      "file": "GroupService.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "id": 5,
+      "title": "Kafka event publishing in domain service layer",
+      "detail": "UmsEventBus.PublishAsync() is called directly from DefaultUserService and GroupService after persistence operations. This couples domain logic to Kafka infrastructure: the service must know about topics, Avro serialisation, and delivery semantics. If Kafka is unavailable the business operation fails. The pattern should be: aggregate raises an in-process domain event → a post-commit dispatcher reads pending events and publishes to Kafka. This decouples the domain from the transport and enables reliable outbox patterns.",
+      "file": "DefaultUserService.cs",
+      "severity": "P0",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 6,
+      "title": "Dual aggregate write in group membership — consistency gap",
+      "detail": "When a user is added to a group, both Group.DirectGroupIds (logically the group's member list) and User.DirectGroupIds (the user's group list) are updated in the same service method across two repository calls without a unit-of-work boundary. If the second write fails, the aggregate pair is inconsistent. One of these lists should be the single source of truth (the join table in SQL) and the other derived, or both writes should be wrapped in a transaction/outbox.",
+      "file": "GroupService.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 7,
+      "title": "DefaultUserService god object — 16 dependencies",
+      "detail": "DefaultUserService constructor takes 16 injected dependencies (IGroupRepository, IUserRepository, IUserIdentifyValidator, ICustomPropertyService, IDataSchemaService, ICustomPropertyVerifyService, ILibraryCacheNotitionSevice, IRequestContext, IUmsEventBus, ILogger, UmsDeployInfo, IUserCacheService, IHttpContextAccessor, IUserPostChangeProcessor, IGroupInterceptor, IGroupMemberEventService) and spans ~2,200 lines. It mixes CRUD, validation, cache management, event publishing, HTTP context inspection, and feature flag evaluation in a single class.",
+      "file": "DefaultUserService.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 8,
+      "title": "Infrastructure calls directly in BulkController",
+      "detail": "BulkController injects IBlobStorageService and IJobManagementService and calls them directly in action methods: UploadAsync calls BlobStorageService.UploadAsync(), GetDownloadFileAsync calls BlobStorageService.GetDownloadUrlAsync(), GetExceptionDownloadFileAsync calls BlobStorageService.UploadAsync() and writes CSV bytes inline. Controllers should delegate to application services; infrastructure must not be called from the HTTP layer.",
+      "file": "BulkController.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "id": 9,
+      "title": "Domain events modelled as Kafka infrastructure events",
+      "detail": "UserEvent, GroupEvent, GroupMemberEvent, and UserCustomPropertyEvent are Avro-serialised Kafka message classes living in the infrastructure layer. There is no domain event abstraction (e.g. IDomainEvent). Business logic raises events by calling IUmsEventBus directly rather than appending to an aggregate's domain event list, coupling the domain layer to the messaging infrastructure.",
+      "file": "DefaultUserService.cs",
+      "severity": "P0",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 10,
+      "title": "Domain events fired from service, not aggregate",
+      "detail": "Events are constructed and dispatched directly in service method bodies: DefaultUserService.cs:680 (_umsEventBus.SendUserEvent), GroupService.cs:106 (_umsEventBus.SendGroupEvent). Aggregates have no Raise() mechanism, so any code path that bypasses the service layer can silently omit events. This also couples the service to Kafka infrastructure rather than to a domain event abstraction.",
+      "file": "DefaultUserService.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 11,
+      "title": "SmartGroup rule logic not encapsulated in a distinct aggregate",
+      "detail": "SmartGroup has a rich rule language (Rule.cs, SmartGroupUnit.cs, per-field operator validators in RuleFields/, SmartGroupRuleSetListValidationHelper) but reuses the flat Group aggregate with a GroupType.Smart discriminator. Rule invariants such as valid operator-field combinations and rule-set depth constraints are validated in DefaultSmartGroupService rather than enforced by a SmartGroup aggregate that expresses these as first-class business rules.",
+      "file": "DefaultSmartGroupService.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 12,
+      "title": "UserService has cross-domain knowledge of GroupMemberEvent",
+      "detail": "DefaultUserService injects IGroupMemberEventService and calls it directly during membership operations (DefaultUserService.cs:513 and 601). The User Identity domain should not know how to construct or publish Group-domain events; this coupling means a change to GroupMemberEvent structure forces changes inside DefaultUserService.",
+      "file": "DefaultUserService.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 13,
+      "title": "UserSyncConfig stores opaque JToken blobs instead of typed value objects",
+      "detail": "UserSyncConfig.ExternalAuthentication and SyncProperties are JToken fields — opaque JSON blobs at the type-system level. Business constraints on valid sync configuration are invisible to the compiler. Additionally, AesCryptor is instantiated ad-hoc in UserSyncConfigService instead of being injected, coupling the domain service to a concrete infrastructure class.",
+      "file": "UserSyncConfig.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 14,
+      "title": "No in-process domain events — post-persist side effects are invisible",
+      "detail": "Domain events (UserCreated, GroupMemberAdded) are produced only as Kafka messages after persistence. There is no in-process IEventDispatcher or domain event collection on aggregates. This means side effects (welcome email, smart group recompute, V1–V2 sync) cannot be triggered synchronously in tests without a running Kafka broker. Introducing a DomainEvent base class and collecting events on the aggregate before dispatch would allow all consumers to be tested in-process.",
+      "file": "User.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 15,
+      "title": "SCIM PatchOp translation in controller layer",
+      "detail": "SCIMUsersController and SCIMGroupsController translate SCIM PATCH operations (RFC 7644 §3.5.2 op/value/path semantics) into internal model mutations inline in the controller action. This is protocol logic that belongs in an anti-corruption layer (SCIMAdapter or SCIMPatchTranslator service) that maps SCIM concepts to domain commands, keeping the controller a thin HTTP boundary.",
+      "file": "SCIMUsersController.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 16,
+      "title": "Value objects missing — UserType, TenantId, ShortGuid as primitives",
+      "detail": "UserType is used as an enum but validation (e.g., 'Partner users cannot have Premium features') is scattered across service checks. TenantId is a raw string/Guid passed into every method instead of being a typed value object that could carry its own validation. ShortGuid is converted ad-hoc throughout. Introducing UserType, TenantId, and ShortGuid value objects with self-validating constructors would eliminate an entire class of invalid-argument bugs and make method signatures self-documenting.",
+      "file": "User.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 17,
+      "title": "Specification pattern absent — SmartGroup rule evaluation coupled to persistence",
+      "detail": "DefaultSmartGroupService.cs builds raw SQL/EF predicates from Rule objects rather than using a composable Specification pattern. The partial RuleSet/Rule value objects exist but do not implement ISpecification<User>. Adding a UserSpecificationBuilder that converts a RuleSet to an IQueryable<User> predicate would isolate query construction, make individual rules unit-testable in memory, and allow smart group evaluation to run without a DB in tests.",
+      "file": "DefaultSmartGroupService.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 18,
+      "title": "GroupService god object — 14 dependencies",
+      "detail": "GroupService constructor takes 14 injected dependencies and directly calls ICacheService.InvalidateAsync(), IUmsEventBus.SendGroupEvent(), IGroupRepository, and IGroupV2OwnerRepository inside business methods. Validation, persistence, caching, and event publishing are collapsed into a single service.",
+      "file": "GroupService.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 19,
+      "title": "SCIM layer bypasses User/Group domain layer",
+      "detail": "SCIMUsersController injects IScimUserService and ISCIMGroupService which make direct repository calls rather than routing through DefaultUserService and GroupService. This means SCIM provisioning bypasses domain invariants (e.g. SSO-ID uniqueness, EveryoneGroup protection) enforced only in the core services.",
+      "file": "SCIMUsersController.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 20,
+      "title": "LaunchDarkly feature flag evaluated inside domain service",
+      "detail": "DefaultUserService calls LaunchDarklyHelper.EnableRepoV2() inside business methods to choose between LibraryUser and LibraryUserV2 repositories. Feature flag infrastructure does not belong in the domain layer; this should be resolved at the application or composition root layer before reaching the service.",
+      "file": "DefaultUserService.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 21,
+      "title": "BulkJobService is a thin JMS wrapper with no domain logic",
+      "detail": "BulkJobService contains two lines of logic per method — all delegating directly to IJobManagementService. The BulkJob lifecycle (Queued → Processing → Completed/Failed/Cancelled) has no aggregate representation; state transitions are entirely implicit in JMS.",
+      "file": "BulkJobService.cs",
+      "severity": "P1",
+      "category": "Anemic model"
+    },
+    {
+      "id": 22,
+      "title": "HTTP context inspected inside DefaultUserService",
+      "detail": "DefaultUserService accesses IHttpContextAccessor.HttpContext.Request.Headers inside business methods to extract caller context. Domain services must not depend on HTTP infrastructure; caller identity should be passed as a typed parameter from the application layer.",
+      "file": "DefaultUserService.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 23,
+      "title": "V1/V2 dual-write complexity with bidirectional sync consumers",
+      "detail": "UserEventConsumerForV1ToV2Sync and UserEventConsumerForV2ToV1Sync maintain bidirectional synchronisation between LibraryUser and LibraryUserV2. This creates a potential event loop, complicates debugging, and doubles the surface area for data inconsistency. A migration completion date and V1 deprecation plan should be established to eliminate the dual-write path.",
+      "file": "UserV1V2SyncService.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 24,
+      "title": "Username, Email, and SsoId modelled as raw strings",
+      "detail": "User identity attributes — Name (used as username), email inside UserProfileEntity, SsoId inside UserAuthSecretEntity — are raw strings. There are no Email, Username, or SsoId value objects enforcing format rules at construction time; validation is duplicated imperatively across DefaultUserService and controller validation logic.",
+      "file": "User.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 25,
+      "title": "UserAuthSecretEntity accessed via late-bound JToken cast",
+      "detail": "Auth credentials are stored in User.Data[\"authSecret\"] and retrieved via .ToObject<UserAuthSecretEntity>() at runtime (DefaultUserService.cs:637). This bypasses compile-time type safety, makes the sub-entity invisible to aggregate invariant checks, and means a schema change to UserAuthSecretEntity produces a runtime deserialisation failure rather than a compile error.",
+      "file": "User.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 26,
+      "title": "Legacy ID fields maintained alongside ShortGuid — model pollution",
+      "detail": "User.DirectGroupLegacyIds, Group.OwnerUserLegacyIds, and similar *LegacyId collections coexist with ShortGuid variants across the domain model. V1–V2 sync consumers exist purely to keep these in sync at runtime. The legacy fields are an integration seam, not a domain concept, and should be isolated to an ACL/adapter layer so the domain model speaks only in ShortGuid.",
+      "file": "User.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 27,
+      "title": "Cache invalidation logic in domain service",
+      "detail": "DefaultUserService and GroupService call IUserCacheService.InvalidateCacheAsync() and ILibraryCacheNotionService after writes. Cache management is an infrastructure concern and should not be a service-layer dependency in domain code. An event-driven cache invalidation handler (triggered by persisted domain events) would keep the domain service free of cache semantics.",
+      "file": "DefaultUserService.cs",
+      "severity": "P2",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 28,
+      "title": "WelcomeEmail rule logic as free functions outside aggregate",
+      "detail": "SmartRuleCalculationUtil.cs and WelcomeEmailRuleUtil.cs are static helper classes containing rule evaluation logic that semantically belongs to the EmailTemplate aggregate (specifically its WelcomeEmailRule value object). This makes the aggregate passively hold data while helpers perform all computation, a secondary anemic symptom in the Email Notification domain.",
+      "file": "WelcomeEmailRuleUtil.cs",
+      "severity": "P2",
+      "category": "Anemic model"
+    },
+    {
+      "id": 29,
+      "title": "No read model for People Search — direct multi-repository fan-out",
+      "detail": "CombinedSearchService and PeopleService fan out to IUserRepository and IGroupRepository directly with no CQRS read projection or materialised view. Queries cross the User and Group domain boundaries without a dedicated query model, making performance tuning and search relevance improvements difficult.",
+      "file": "CombinedSearchService.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 30,
+      "title": "Repository interface fragmentation",
+      "detail": "The codebase defines IUserRepository, IBulkUserRepository, IThinUserRepository, IUserCacheService, IGroupRepository, IGroupV2OwnerRepository, and more. The proliferation of narrow repository interfaces without a query specification pattern leads to duplicate method signatures and makes it hard to understand the full query surface of each aggregate.",
+      "file": "IUserRepository.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 31,
+      "title": "Controllers return domain model objects directly",
+      "detail": "Several controllers return User and Group domain objects (or collections thereof) directly via IActionResult without mapping to response DTOs. This couples the API contract to the internal domain model, making non-breaking API evolution harder and leaking internal fields (e.g. LegacyId, DirectManagedGroupLegacyIds) to external consumers.",
+      "file": "UserController.cs",
+      "severity": "P2",
+      "category": "Layer violation"
+    }
+  ],
+  "domains": [
+    {
+      "id": "user-identity",
+      "name": "User",
+      "icon": "👤",
+      "health": "anemic",
+      "operations": [
+        "UserController — GET/POST/PUT/DELETE /api/ums/v1/tenants/{tenantId}/users",
+        "UserV2Controller — V2 user CRUD endpoints",
+        "V2MigrationController — trigger V1→V2 data migration",
+        "DefaultUserService.CreateUserAsync",
+        "DefaultUserService.DeactivateUsersAsync",
+        "DefaultUserService.DeleteUsersAsync",
+        "DefaultUserService.UpdateUserAsync"
+      ],
+      "keywords": [
+        "User",
+        "DefaultUserService",
+        "IUserService",
+        "IUserRepository",
+        "LibraryUser",
+        "LibraryUserV2",
+        "UserEvent",
+        "UserIdentification"
+      ],
+      "dddTarget": {
+        "aggregate": "User",
+        "identity": "Id (GUID, ShortGuid encoded)",
+        "lifecycle": [
+          "Active",
+          "Deactivated",
+          "Locked",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "UserIdentification",
+          "CustomPropertyValue",
+          "ShortGuid",
+          "UserSystemTypeMapping",
+          "PagingExpression",
+          "QueryParameter",
+          "KeywordParameter"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Name cannot be null or whitespace",
+          "TenantId cannot be null or whitespace and must match request context",
+          "Id must be a valid ShortGuid when set",
+          "Username must be unique per tenant",
+          "SsoId must be unique per tenant",
+          "User cannot be manually added to a Smart or Everyone group",
+          "Batch size must not exceed 1000 users per operation",
+          "Organization, FirstName, LastName must not contain potentially malicious content"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(name, type, tenantId, systems)",
+            "event": "UserCreated"
+          },
+          {
+            "cmd": "Activate(userId, actorId)",
+            "event": "UserActivated"
+          },
+          {
+            "cmd": "Deactivate(userId, actorId)",
+            "event": "UserDeactivated"
+          },
+          {
+            "cmd": "Delete(userId, actorId)",
+            "event": "UserDeleted"
+          },
+          {
+            "cmd": "UpdateProfile(userId, profileData)",
+            "event": "UserUpdated"
+          },
+          {
+            "cmd": "AssignToGroup(userId, groupId)",
+            "event": "UserGroupMembershipChanged"
+          },
+          {
+            "cmd": "RemoveFromGroup(userId, groupId)",
+            "event": "UserGroupMembershipChanged"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group",
+      "name": "Group",
+      "icon": "🤝",
+      "health": "anemic",
+      "operations": [
+        "GroupController — GET/POST/PUT/DELETE /api/ums/v1/tenants/{tenantId}/groups",
+        "GroupController — member add/remove operations",
+        "GroupService.CreateUserGroupAsync",
+        "GroupService.DeactivateGroupsAsync",
+        "GroupService.DeleteUserGroupAsync",
+        "GroupService.ModifyGroupOwners"
+      ],
+      "keywords": [
+        "Group",
+        "GroupService",
+        "IGroupService",
+        "IGroupRepository",
+        "UserGroup",
+        "GroupType",
+        "GroupEvent",
+        "GroupMemberEvent"
+      ],
+      "dddTarget": {
+        "aggregate": "Group",
+        "identity": "Id (GUID)",
+        "lifecycle": [
+          "Active",
+          "Deactivated",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "UserIdentification",
+          "GroupOperation",
+          "GroupOwnerOperation"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Name cannot be null or whitespace",
+          "Group name must be unique per tenant",
+          "Everyone group cannot be deleted, renamed, or have members manually assigned",
+          "Smart group members cannot be manually assigned or removed",
+          "Type cannot be changed after creation"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(name, type, tenantId)",
+            "event": "GroupCreatedEvent"
+          },
+          {
+            "cmd": "AddMember(userId)",
+            "event": "GroupMemberAddedEvent"
+          },
+          {
+            "cmd": "RemoveMember(userId)",
+            "event": "GroupMemberRemovedEvent"
+          },
+          {
+            "cmd": "AssignOwner(userId)",
+            "event": "GroupOwnerAssignedEvent"
+          },
+          {
+            "cmd": "Deactivate(deactivatedBy)",
+            "event": "GroupDeactivatedEvent"
+          },
+          {
+            "cmd": "Delete(deletedBy)",
+            "event": "GroupDeletedEvent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "smart-group",
+      "name": "Smart Group",
+      "icon": "⚙️",
+      "health": "partial",
+      "operations": [
+        "SmartGroupController — GET/POST/PUT/DELETE /api/ums/v1/tenants/{tenantId}/smart-groups",
+        "SmartGroupJobService — async rule evaluation on user attribute change",
+        "UserEventConsumerForSmartGroup — triggers re-evaluation on UserEvent"
+      ],
+      "keywords": [
+        "SmartGroup",
+        "DefaultSmartGroupService",
+        "SmartGroupRepository",
+        "SmartGroupFieldRepository",
+        "SmartGroupJobService"
+      ],
+      "dddTarget": {
+        "aggregate": "SmartGroup",
+        "identity": "Id (GUID)",
+        "lifecycle": [
+          "Pending",
+          "Running",
+          "Succeeded",
+          "Failed"
+        ],
+        "valueObjects": [
+          "SmartGroupRule",
+          "SmartGroupField"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "RuleSet operator must be from supported OperatorCategory",
+          "Rule field key must be a known SmartGroupFieldKey",
+          "Date range rules must have start before end",
+          "Rules referencing manager or membership fields must have valid target IDs"
+        ],
+        "commands": [
+          {
+            "cmd": "CreateWithRules(ruleSet, tenantId)",
+            "event": "SmartGroupCreated"
+          },
+          {
+            "cmd": "UpdateRules(ruleSet)",
+            "event": "SmartGroupRulesUpdated"
+          },
+          {
+            "cmd": "Recompute()",
+            "event": "SmartGroupMembershipRecomputed"
+          },
+          {
+            "cmd": "Delete(actorId)",
+            "event": "SmartGroupDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "manager-hierarchy",
+      "name": "Manager Hierarchy",
+      "icon": "👤",
+      "health": "partial",
+      "operations": [
+        "ManagerHierarchyController — GET /api/ums/v1/tenants/{tenantId}/users/{userId}/hierarchy",
+        "HierarchyGroupController — GET/POST /api/ums/v1/tenants/{tenantId}/hierarchy-groups",
+        "ManagerHierarchyMigrationController — sync and migrate hierarchy data",
+        "ManagerHierarchyJobService — async subtree rebuild",
+        "ManagerHierarchyService.AssignManager",
+        "HierarchyGroupService.RebuildHierarchyGroups"
+      ],
+      "keywords": [
+        "ManagerHierarchy",
+        "ManagerHierarchyService",
+        "HierarchyGroupService",
+        "ManagerHierarchyJobService",
+        "HierarchyGroup",
+        "UserSyncResultEvent"
+      ],
+      "dddTarget": {
+        "aggregate": "ManagerHierarchyNode",
+        "identity": "UserId (GUID)",
+        "lifecycle": [
+          "Active",
+          "Orphaned",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "ReportingLine",
+          "HierarchyDepth"
+        ],
+        "childEntities": [
+          "HierarchyGroup"
+        ],
+        "invariants": [
+          "No circular reporting relationships allowed",
+          "A user may have at most one direct manager",
+          "Hierarchy groups must always mirror the live reporting tree"
+        ],
+        "commands": [
+          {
+            "cmd": "AssignManager(managerId, tenantId)",
+            "event": "ManagerAssignedEvent"
+          },
+          {
+            "cmd": "RemoveManager(tenantId)",
+            "event": "ManagerRemovedEvent"
+          },
+          {
+            "cmd": "RebuildSubtree(rootUserId)",
+            "event": "HierarchyRebuiltEvent"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "custom-property",
+      "name": "Custom Property",
+      "icon": "🏷",
+      "health": "good",
+      "operations": [
+        "CustomPropertyController — GET/POST/PUT/DELETE /api/ums/v1/tenants/{tenantId}/custom-properties",
+        "DataSchemaController — extension data schema management",
+        "CustomPropertyService.DefinePropertyAsync",
+        "CustomPropertyService.ValidatePropertyValueAsync",
+        "CustomPropertySyncService — propagates property changes downstream"
+      ],
+      "keywords": [
+        "CustomPropertySchema",
+        "CustomPropertyService",
+        "ICustomPropertyService",
+        "LibraryCustomProperty",
+        "UMSQuery",
+        "UserCustomPropertyEvent",
+        "PropertyType"
+      ],
+      "dddTarget": {
+        "aggregate": "CustomPropertySchema",
+        "identity": "Id (GUID)",
+        "lifecycle": [
+          "Active",
+          "Deprecated"
+        ],
+        "valueObjects": [
+          "PropertyType",
+          "PropertyValidationRule",
+          "DropdownOption"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Property name must be unique per tenant",
+          "Domain-value list required when type is DomainList",
+          "Property values must match declared type",
+          "XSS-safe: string values may not contain script tags"
+        ],
+        "commands": [
+          {
+            "cmd": "Define(name, type, domainValues, tenantId)",
+            "event": "CustomPropertyDefined"
+          },
+          {
+            "cmd": "UpdateDomainValues(domainValues)",
+            "event": "CustomPropertyUpdated"
+          },
+          {
+            "cmd": "AssignValue(entityId, entityType, value)",
+            "event": "CustomPropertyValueAssigned"
+          },
+          {
+            "cmd": "Delete(actorId)",
+            "event": "CustomPropertyDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "delegation",
+      "name": "Delegation",
+      "icon": "🔐",
+      "health": "partial",
+      "operations": [
+        "DelegationController — GET/POST/DELETE /api/ums/v1/tenants/{tenantId}/delegations",
+        "DelegationService.GrantDelegationAsync",
+        "DelegationService.RevokeDelegationAsync"
+      ],
+      "keywords": [
+        "Delegation",
+        "DelegationService",
+        "DelegationController",
+        "DelegationScope"
+      ],
+      "dddTarget": {
+        "aggregate": "Delegation",
+        "identity": "Id (GUID)",
+        "lifecycle": [
+          "Active",
+          "Expired",
+          "Revoked"
+        ],
+        "valueObjects": [
+          "DelegationCategory",
+          "DelegationAction",
+          "DelegationParty",
+          "DataDescriptor"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "A user cannot delegate to themselves",
+          "Delegation period must have a defined end date",
+          "An expired delegation cannot be reactivated",
+          "Scope must reference valid permission identifiers"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(principal, agent, category, action, descriptor)",
+            "event": "DelegationCreated"
+          },
+          {
+            "cmd": "Update(category, action, descriptor)",
+            "event": "DelegationUpdated"
+          },
+          {
+            "cmd": "Revoke(actorId)",
+            "event": "DelegationRevoked"
+          }
+        ]
+      }
+    },
+    {
+      "id": "bulk-operations",
+      "name": "Bulk Operation",
+      "icon": "📦",
+      "health": "anemic",
+      "operations": [
+        "BulkController — POST /api/ums/v1/tenants/{tenantId}/bulk (upload, import, export)",
+        "BulkController.GetDownloadFileAsync — direct BlobStorageService call",
+        "BulkController.GetExceptionDownloadFileAsync — direct BlobStorageService.UploadAsync in controller",
+        "UmsJobsController — GET/DELETE /ums-jobs",
+        "BulkJobService.CreateImportBulkJobAsync",
+        "BulkJobService.CreateExportBulkJobAsync"
+      ],
+      "keywords": [
+        "BulkJob",
+        "BulkController",
+        "BulkJobService",
+        "IBulkJobService",
+        "IBlobStorageService",
+        "IJobManagementService",
+        "BulkTemplateService"
+      ],
+      "dddTarget": {
+        "aggregate": "BulkJob",
+        "identity": "JobId (GUID)",
+        "lifecycle": [
+          "Queued",
+          "Processing",
+          "Completed",
+          "Failed",
+          "Cancelled"
+        ],
+        "valueObjects": [
+          "BulkOperationType",
+          "BlobReference",
+          "BulkJobResult"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "A completed or failed job cannot be retried without creating a new job",
+          "A cancelled job must release its blob storage reference",
+          "Results are immutable once the job reaches a terminal state"
+        ],
+        "commands": [
+          {
+            "cmd": "EnqueueImport(fileRef, templateId, actorId)",
+            "event": "BulkJobQueued"
+          },
+          {
+            "cmd": "Start()",
+            "event": "BulkJobStarted"
+          },
+          {
+            "cmd": "Complete(itemResults)",
+            "event": "BulkJobCompleted"
+          },
+          {
+            "cmd": "Fail(error)",
+            "event": "BulkJobFailed"
+          },
+          {
+            "cmd": "Cancel(actorId)",
+            "event": "BulkJobCancelled"
+          }
+        ]
+      }
+    },
+    {
+      "id": "scim-protocol",
+      "name": "SCIM Provisioning",
+      "icon": "🔄",
+      "health": "partial",
+      "operations": [
+        "SCIMUsersController — SCIM /Users CRUD and group membership",
+        "SCIMGroupsController — SCIM /Groups CRUD",
+        "SCIMBulkRequestController — SCIM bulk provisioning",
+        "SCIMSchemasController — SCIM schema discovery",
+        "SCIMServiceProviderConfigurationController — SCIM capability advertisement",
+        "SCIMResourceTypesController — resource type metadata"
+      ],
+      "keywords": [
+        "SCIMUsersController",
+        "SCIMGroupsController",
+        "IScimUserService",
+        "ISCIMGroupService",
+        "SeismicCore2EnterpriseUser",
+        "ScimFilter",
+        "ScimPatchOp"
+      ],
+      "dddTarget": {
+        "aggregate": "ScimSession",
+        "identity": "ExternalId (string)",
+        "lifecycle": [
+          "Pending",
+          "Synced",
+          "Conflicted",
+          "Deprovisioned"
+        ],
+        "valueObjects": [
+          "ScimResource",
+          "ScimPatchOp",
+          "ScimFilter"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "SCIM externalId must map to exactly one internal user or group",
+          "Patch operations must be applied atomically",
+          "SCIM responses must conform to RFC 7644 envelope structure"
+        ],
+        "commands": [
+          {
+            "cmd": "ProvisionUser(scimUserResource)",
+            "event": "UserProvisionedViaSCIMEvent"
+          },
+          {
+            "cmd": "DeprovisionUser(externalId)",
+            "event": "UserDeprovisionedViaSCIMEvent"
+          },
+          {
+            "cmd": "SyncGroup(scimGroupResource)",
+            "event": "GroupSyncedViaSCIMEvent"
+          },
+          {
+            "cmd": "PatchResource(externalId, patchOps)",
+            "event": "SCIMResourcePatchedEvent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "user-sync-config",
+      "name": "User Sync Config",
+      "icon": "🔄",
+      "health": "partial",
+      "operations": [
+        "UserSyncConfigController — GET/POST/PUT /user-sync-config",
+        "QueryStorageController — GET/POST/DELETE /query-storage",
+        "EmailTemplateController — GET/PUT /email-templates",
+        "UserSyncConfigService.ConfigureProviderAsync",
+        "UserSyncConfigService.PauseSyncAsync"
+      ],
+      "keywords": [
+        "UserSyncConfig",
+        "UserSyncConfigService",
+        "IUserSyncConfigService",
+        "QueryStorageController",
+        "EmailTemplateController",
+        "SyncAttributeMapping",
+        "IdentityProviderType"
+      ],
+      "dddTarget": {
+        "aggregate": "UserSyncConfig",
+        "identity": "Id (GUID)",
+        "lifecycle": [
+          "Active",
+          "Paused",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "SyncAttributeMapping",
+          "SyncSchedule",
+          "IdentityProviderType"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "A paused sync config will not process incoming IdP events",
+          "Attribute mappings must reference valid custom property schemas",
+          "A deleted sync config cannot be reactivated"
+        ],
+        "commands": [
+          {
+            "cmd": "Configure(sourceSystem, rules, credentials, schedule)",
+            "event": "SyncConfigured"
+          },
+          {
+            "cmd": "Enable()",
+            "event": "SyncEnabled"
+          },
+          {
+            "cmd": "Disable()",
+            "event": "SyncDisabled"
+          },
+          {
+            "cmd": "Delete(actorId)",
+            "event": "SyncConfigDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "query-storage",
+      "name": "People Search",
+      "icon": "🔍",
+      "health": "partial",
+      "operations": [
+        "UsersAndGroupsController — GET /users-and-groups/search",
+        "PeopleController — GET /people",
+        "QueryStorageController — saved query CRUD",
+        "CacheMetadataController — cache warm and invalidation",
+        "CombinedSearchService.SearchAsync",
+        "PeopleService.GetPeopleAsync"
+      ],
+      "keywords": [
+        "CombinedSearchService",
+        "PeopleService",
+        "IQueryService",
+        "UsersAndGroupsController",
+        "PeopleController",
+        "SavedQuery",
+        "CacheMetadataController"
+      ],
+      "dddTarget": {
+        "aggregate": "SavedQuery",
+        "identity": "QueryId (GUID)",
+        "lifecycle": [
+          "Saved",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "QueryFilter",
+          "QueryProjection",
+          "QuerySort"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Query name must be non-empty",
+          "Filter field keys must reference valid schema attributes",
+          "Owner must be an active user in the tenant"
+        ],
+        "commands": [
+          {
+            "cmd": "Save(name, filters, sorts, ownerId)",
+            "event": "QuerySaved"
+          },
+          {
+            "cmd": "Update(name, filters, sorts)",
+            "event": "QueryUpdated"
+          },
+          {
+            "cmd": "Delete(actorId)",
+            "event": "QueryDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "organizational-hierarchy",
+      "name": "Organizational Hierarchy",
+      "icon": "⚙️",
+      "health": "partial",
+      "operations": [
+        "HierarchyGroupController: CRUD /hierarchygroups, GET /hierarchygroups/{id}/path, POST /hierarchygroups/rebuild",
+        "ManagerHierarchyController: GET /managerhierarchy/{userId}/reports, GET /managerhierarchy/{userId}/chain",
+        "ManagerHierarchyMigrationController: POST /managerhierarchy/migrate, GET /managerhierarchy/migration/status"
+      ],
+      "keywords": [
+        "hierarchy",
+        "manager",
+        "reports",
+        "path",
+        "org",
+        "rebuild",
+        "tree",
+        "chain"
+      ],
+      "dddTarget": {
+        "aggregate": "HierarchyGroup",
+        "identity": "Id (ShortGuid) + TenantId",
+        "lifecycle": [
+          "Active",
+          "Rebuilding",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "HierarchyGroupPath"
+        ],
+        "childEntities": [
+          "HierarchyGroupHistory",
+          "HierarchyGroupIndirectMember",
+          "ManagerHierarchyNode"
+        ],
+        "invariants": [
+          "No circular parent-child relationships",
+          "Parent must exist if ParentId is specified",
+          "Path must be recomputed after any parent change"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(name, parentId, tenantId)",
+            "event": "HierarchyGroupCreated"
+          },
+          {
+            "cmd": "MoveUnder(newParentId)",
+            "event": "HierarchyGroupMoved"
+          },
+          {
+            "cmd": "Rebuild()",
+            "event": "HierarchyRebuilt"
+          },
+          {
+            "cmd": "Delete(actorId)",
+            "event": "HierarchyGroupDeleted"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "user-settings",
+      "name": "Email Notification",
+      "icon": "📄",
+      "health": "partial",
+      "operations": [
+        "EmailTemplateController: GET /emailtemplates, POST /emailtemplates, PUT /emailtemplates/{id}, DELETE /emailtemplates/{id}, POST /emailtemplates/{id}/sendtest"
+      ],
+      "keywords": [
+        "email",
+        "welcome",
+        "template",
+        "notification",
+        "rule",
+        "trigger",
+        "smtp"
+      ],
+      "dddTarget": {
+        "aggregate": "EmailTemplate",
+        "identity": "Id (ShortGuid) + TenantId",
+        "lifecycle": [
+          "Active",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "TemplateContent",
+          "WelcomeEmailRule",
+          "SmartRule"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Subject and body must be non-empty",
+          "WelcomeEmailRule criteria must reference valid user attribute fields",
+          "Only one active default welcome template per tenant"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(name, subject, body, rules, tenantId)",
+            "event": "EmailTemplateCreated"
+          },
+          {
+            "cmd": "Update(subject, body, rules)",
+            "event": "EmailTemplateUpdated"
+          },
+          {
+            "cmd": "SendWelcome(userId)",
+            "event": "WelcomeEmailDispatched"
+          },
+          {
+            "cmd": "Delete(actorId)",
+            "event": "EmailTemplateDeleted"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "platform-operations",
+      "name": "Platform Operations",
+      "icon": "⚙️",
+      "health": "good",
+      "operations": [
+        "AboutController",
+        "CacheMetadataController",
+        "QueryStorageController",
+        "UmsJobsController",
+        "V2MigrationController"
+      ],
+      "keywords": [
+        "health",
+        "cache",
+        "job",
+        "migration",
+        "query storage",
+        "JMS",
+        "v2",
+        "Matrix"
+      ],
+      "dddTarget": {
+        "aggregate": "UmsJob",
+        "identity": "string jobTypeId",
+        "lifecycle": [
+          "Created",
+          "Running",
+          "Completed",
+          "Failed"
+        ],
+        "valueObjects": [],
+        "childEntities": [],
+        "invariants": [],
+        "commands": [
+          {
+            "cmd": "CreateUmsJobAsync(string tenantId, string jobTypeId)",
+            "event": "none"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    }
+  ],
+  "workflows": [
+    {
+      "id": "scim-user-provisioning",
+      "name": "SCIM User Provisioning",
+      "domains": [
+        "scim-provisioning",
+        "user",
+        "custom-property",
+        "smart-group"
+      ],
+      "steps": [
+        {
+          "label": "IdP sends SCIM POST /Users to SCIMUsersController",
+          "type": "api"
+        },
+        {
+          "label": "SCIMUsersController validates SCIM resource envelope",
+          "type": "domain"
+        },
+        {
+          "label": "IScimUserService maps SeismicCore2EnterpriseUser to internal User model",
+          "type": "domain"
+        },
+        {
+          "label": "DefaultUserService.CreateUserAsync enforces SSO-ID uniqueness and creates User",
+          "type": "domain"
+        },
+        {
+          "label": "CustomPropertyService applies mapped attribute values",
+          "type": "domain"
+        },
+        {
+          "label": "UmsEventBus.SendUserEvent publishes UserCreatedEvent to Kafka",
+          "type": "kafka"
+        },
+        {
+          "label": "UserEventConsumerForSmartGroup receives UserCreatedEvent",
+          "type": "background"
+        },
+        {
+          "label": "SmartGroupJobService evaluates all tenant smart group rules against new user",
+          "type": "background"
+        },
+        {
+          "label": "GroupMemberEvent published for each smart group membership gain",
+          "type": "kafka"
+        }
+      ]
+    },
+    {
+      "id": "bulk-user-import",
+      "name": "Bulk User Import",
+      "domains": [
+        "bulk-operation",
+        "user",
+        "group",
+        "custom-property"
+      ],
+      "steps": [
+        {
+          "label": "Client POSTs file to BulkController.UploadAsync",
+          "type": "api"
+        },
+        {
+          "label": "BulkController calls IBlobStorageService.UploadAsync directly (infra in controller)",
+          "type": "violation"
+        },
+        {
+          "label": "BulkController calls IBulkJobService.CreateImportBulkJobAsync",
+          "type": "domain"
+        },
+        {
+          "label": "BulkJobService calls IJobManagementService.CreateBulkImportJobAsync (infra in service)",
+          "type": "violation"
+        },
+        {
+          "label": "JMS executes job asynchronously in Executor layer",
+          "type": "background"
+        },
+        {
+          "label": "BulkJobService processes each row via DefaultUserService.CreateUserAsync or UpdateUserAsync",
+          "type": "domain"
+        },
+        {
+          "label": "GroupService.AddMemberAsync updates group memberships per row",
+          "type": "domain"
+        },
+        {
+          "label": "CustomPropertyService applies property values per row",
+          "type": "domain"
+        },
+        {
+          "label": "BulkJobCompletedEvent published to Kafka on terminal state",
+          "type": "kafka"
+        }
+      ]
+    },
+    {
+      "id": "manager-hierarchy-rebuild",
+      "name": "Manager Hierarchy Rebuild",
+      "domains": [
+        "manager-hierarchy",
+        "group"
+      ],
+      "steps": [
+        {
+          "label": "ManagerHierarchyMigrationController triggers rebuild via POST",
+          "type": "api"
+        },
+        {
+          "label": "ManagerHierarchyJobService queues async subtree rebuild via JMS",
+          "type": "background"
+        },
+        {
+          "label": "ManagerHierarchyService traverses user manager fields to compute tree",
+          "type": "domain"
+        },
+        {
+          "label": "HierarchyGroupService updates HierarchyGroup entities to mirror new tree",
+          "type": "domain"
+        },
+        {
+          "label": "UserSyncResultEvent published to Kafka with batch membership changes",
+          "type": "kafka"
+        },
+        {
+          "label": "UserEventConsumer processes downstream group membership side-effects",
+          "type": "background"
+        }
+      ]
+    },
+    {
+      "id": "smart-group-rule-evaluation",
+      "name": "Smart Group Rule Evaluation",
+      "domains": [
+        "smart-group",
+        "user",
+        "custom-property"
+      ],
+      "steps": [
+        {
+          "label": "UserEvent consumed by UserEventConsumerForSmartGroup",
+          "type": "kafka"
+        },
+        {
+          "label": "SmartGroupJobService identifies all smart groups affected by changed user attributes",
+          "type": "background"
+        },
+        {
+          "label": "DefaultSmartGroupService evaluates each rule set against updated user",
+          "type": "domain"
+        },
+        {
+          "label": "Membership delta (adds and removes) computed",
+          "type": "domain"
+        },
+        {
+          "label": "GroupMemberEvent published per membership change",
+          "type": "kafka"
+        },
+        {
+          "label": "GroupEventConsumer updates denormalised group membership data",
+          "type": "background"
+        }
+      ]
+    },
+    {
+      "id": "v1-to-v2-user-migration",
+      "name": "V1 to V2 User Migration",
+      "domains": [
+        "user"
+      ],
+      "steps": [
+        {
+          "label": "V2MigrationController triggers migration via POST",
+          "type": "api"
+        },
+        {
+          "label": "UserV1V2SyncService reads LibraryUser (V1) rows in batches",
+          "type": "background"
+        },
+        {
+          "label": "V1 fields mapped to LibraryUserV2 schema",
+          "type": "domain"
+        },
+        {
+          "label": "LaunchDarkly flag gates V2 read path activation per tenant",
+          "type": "external"
+        },
+        {
+          "label": "UserEventConsumerForV1ToV2Sync keeps V2 in sync with live V1 writes",
+          "type": "kafka"
+        },
+        {
+          "label": "UserEventConsumerForV2ToV1Sync back-propagates V2 changes to V1 during dual-write period",
+          "type": "kafka"
+        }
+      ]
+    }
+  ],
+  "integrations": {
+    "kafkaIn": [
+      "eventbus.public.ums.user-event",
+      "eventbus.public.ums.group-event",
+      "eventbus.public.ums.user-full-model-event",
+      "eventbus.public.ums.group-full-model-event",
+      "eventbus.public.auth.user-activity-event"
+    ],
+    "kafkaOut": [
+      "eventbus.public.ums.user-event",
+      "eventbus.public.ums.group-event",
+      "eventbus.public.ums.user-custom-property-event",
+      "eventbus.public.ums.group-member-event",
+      "eventbus.public.ums.user-full-model-event",
+      "eventbus.public.ums.group-full-model-event",
+      "eventbus.public.ums.user-custom-property-full-model-event",
+      "eventbus.public.ums.user-activity-event",
+      "eventbus.public.ums.user-sync-result-event"
+    ],
+    "http": [
+      "AuthService",
+      "JobManagementService",
+      "BlobStorageService",
+      "MatrixClient"
+    ],
+    "background": [
+      "UMSEventConsumerBackgroundService",
+      "SmartGroupJobService",
+      "ManagerHierarchyJobService",
+      "BulkJobService",
+      "UserV1V2SyncService",
+      "GroupV1V2SyncService",
+      "RoleSyncService",
+      "CustomPropertySyncService"
+    ]
+  },
+  "coverageCheck": {
+    "found": 13,
+    "controllers": 30,
+    "appServices": 0,
+    "entities": 9,
+    "coveragePct": 43
+  }
+}

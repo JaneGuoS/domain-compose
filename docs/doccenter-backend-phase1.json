@@ -1,0 +1,1004 @@
+{
+  "service_name": "doccenter",
+  "analyzed_at": "2026-06-11",
+  "tech_stack": "C# / ASP.NET Core 6+, Redis (breadcrumb + content-detail cache), no owned DB — all persistence delegated to upstream services via HTTP and SDK providers",
+  "bounded_context": {
+    "owns": [
+      "content-viewing session state",
+      "breadcrumb cache",
+      "content-detail cache",
+      "pre-load data single-flight coalescing"
+    ],
+    "depends_on": [
+      "ContentProfileService",
+      "ContentManagerService",
+      "ContentDiscoveryService",
+      "UserManagementService",
+      "BlobStorageService",
+      "UniversalPlayerService",
+      "PageStorageService",
+      "DeclarativeAdminSettingsService",
+      "DiscIntakeService",
+      "ContentAugmentationService",
+      "Monolith",
+      "SearchService",
+      "MatrixService",
+      "AuthenticationService",
+      "LaunchDarkly"
+    ],
+    "publishes_kafka": [],
+    "consumes_kafka": [],
+    "http_deps": [
+      "ContentProfileService — profile versions, folder/file tree, permissions, favorites, followers, breadcrumbs",
+      "ContentManagerService — file metadata, versions, discussions, reviews, experts, custom properties, team-site resolution",
+      "ContentDiscoveryService — search-based content location, page preload data",
+      "UserManagementService — user info, group membership, current user type, username, default profile id",
+      "BlobStorageService — thumbnail URL signing, multi-download URL generation",
+      "UniversalPlayerService — streaming playback manifests",
+      "PageStorageService — freestyle slide page data for PPTX/GSLIDES",
+      "DeclarativeAdminSettingsService — tenant DocCenter settings (ratings, reviews toggle)",
+      "DiscIntakeService — content view events for analytics (HTTP POST)",
+      "ContentAugmentationService — barcode augmentation blobIds, watermarked download URLs",
+      "Monolith — file current version resolution (legacy bridge)",
+      "SearchService — content location lookup, user permission validation via search index",
+      "MatrixService (SDK) — FMS feature-flag rules",
+      "AuthenticationService (SDK) — token validation",
+      "LaunchDarkly (SDK) — feature toggles (barcoding, navigation, multi-language variant)"
+    ],
+    "background_services": []
+  },
+  "domains": [
+    {
+      "name": "File",
+      "responsibility": "Resolves, enriches, and exposes a content file's metadata, thumbnails, instructions, experts, HTML site info, and language variants for a given profile context.",
+      "health": "anemic",
+      "health_reason": "FileService is a transaction script — all business rules (permission gating, field merging, rating masking) live in the application service and FileHelper utility; no domain entity with behaviour exists, and ContentDetailService duplicates the same orchestration pattern at 400+ lines.",
+      "key_operations": [
+        "FileController.GetFileAsync",
+        "FileController.GetFileStatusAsync",
+        "FileController.GetContentStatusAsync",
+        "FileController.GetContentPermissionsAsync",
+        "ThumbnailController.GetThumbnailsAsync",
+        "HtmlInfomationController.GetHtmlInformationAsync",
+        "InstructionController.GetInstructionsAsync",
+        "ExpertController.GetExpertsAsync",
+        "ContentDetailController.GetContentDetailV2Async",
+        "ContentDetailController.GetPublishedVariantVersionAsync"
+      ],
+      "keywords": [
+        "contentId",
+        "versionId",
+        "teamSiteId",
+        "profileVersionId",
+        "fileId",
+        "thumbnail",
+        "instruction",
+        "expert",
+        "htmlSite",
+        "variant",
+        "fullPathId",
+        "lf"
+      ],
+      "aggregate": {
+        "class_name": "FileResponse",
+        "identity": "ContentId + VersionId",
+        "lifecycle": [
+          "Draft",
+          "Published",
+          "Archived"
+        ],
+        "value_objects": [
+          "FileFormat",
+          "ContentPermissionResponse",
+          "ThumbnailResponse",
+          "VariantResponse"
+        ],
+        "child_entities": [
+          "ContentSlide"
+        ],
+        "invariants": [
+          "A file can only be viewed if the requesting user has permission on the associated profileVersion",
+          "A file must have both ContentId and VersionId to be considered resolved",
+          "HTML site access is only valid for content of type HTML_ARCHIVE with format ZIP",
+          "Rating fields must be zeroed when tenant setting EnableRating is false"
+        ],
+        "commands": [
+          {
+            "method": "GetFile(profileVersionId, fileId)",
+            "raises": "FileResolved"
+          },
+          {
+            "method": "GetThumbnails(profileVersionId, fileId)",
+            "raises": "ThumbnailsRetrieved"
+          },
+          {
+            "method": "GetInstructions(profileVersionId, fileId)",
+            "raises": "InstructionsRetrieved"
+          },
+          {
+            "method": "GetExperts(profileVersionId, fileId)",
+            "raises": "ExpertsRetrieved"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Folder Navigation",
+      "responsibility": "Browses the folder hierarchy within a content profile, returning children listings, subfolders, breadcrumb trails, ascendant paths, and item-type detection.",
+      "health": "anemic",
+      "health_reason": "FolderService delegates almost entirely to ContentProfileServiceProvider; the only logic present is Redis breadcrumb caching. ItemService has just two methods. No domain entity enforces folder invariants.",
+      "key_operations": [
+        "FolderController.GetFolderAsync",
+        "FolderController.GetChildrenAsync",
+        "FolderController.GetSubFoldersAsync",
+        "FolderController.GetBreadCrumbsAsync",
+        "FolderController.GetAscendantsAsync",
+        "ItemController.GetItemIdAsync",
+        "ItemController.IsFileAsync"
+      ],
+      "keywords": [
+        "folderId",
+        "profileVersionId",
+        "breadcrumb",
+        "children",
+        "subFolders",
+        "ascendants",
+        "fullPathId",
+        "lf prefix",
+        "sort",
+        "offset",
+        "limit"
+      ],
+      "aggregate": {
+        "class_name": "FolderResponse",
+        "identity": "FolderId within ProfileVersionId",
+        "lifecycle": [
+          "Active",
+          "Deleted"
+        ],
+        "value_objects": [
+          "BreadCrumbResponse",
+          "SubFolderResponse",
+          "AscendantsResponse"
+        ],
+        "child_entities": [
+          "ChildrenResponse"
+        ],
+        "invariants": [
+          "A folder must belong to exactly one profile version",
+          "Path segments prefixed with 'lf' are file items, not folder items"
+        ],
+        "commands": [
+          {
+            "method": "GetChildren(profileVersionId, folderId, sort, offset, limit)",
+            "raises": "ChildrenListed"
+          },
+          {
+            "method": "GetBreadCrumbs(profileVersionId, folderId)",
+            "raises": "BreadCrumbsResolved"
+          },
+          {
+            "method": "GetAscendants(profileVersionId, folderId)",
+            "raises": "AscendantsResolved"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Content Profile",
+      "responsibility": "Manages published and predicted content profile versions (library views), including landing pages, logos, thumbnails, default-profile resolution, and channel profiles for NewsCenter.",
+      "health": "anemic",
+      "health_reason": "ProfileService orchestrates multiple provider calls with refill logic (thumbnail URL generation, IsDefault flagging) in-lined; blocking GetAwaiter().GetResult() calls inside Parallel.ForEach risk thread-pool starvation under load.",
+      "key_operations": [
+        "ProfileController.GetContentProfileVersionsAsync",
+        "ProfileController.GetProfileEntriesAsync",
+        "ProfileController.GetProfileEntryAsync",
+        "ProfileController.GetProfileVersionAsync",
+        "ProfileController.GetTeamSiteIdAsync",
+        "NewsCenter/ChannelProfileController.GetChannelProfileVersionsAsync"
+      ],
+      "keywords": [
+        "profileVersionId",
+        "profileId",
+        "teamSiteId",
+        "landingPage",
+        "thumbnail",
+        "logoBlobId",
+        "isPublished",
+        "isDefault",
+        "channelProfile",
+        "predictedProfile"
+      ],
+      "aggregate": {
+        "class_name": "ProfileSummaryResponse",
+        "identity": "ProfileVersionId",
+        "lifecycle": [
+          "Draft",
+          "Published",
+          "Predicted",
+          "Archived"
+        ],
+        "value_objects": [
+          "LandingPageType",
+          "ProfileEntryResponse"
+        ],
+        "child_entities": [
+          "ProfileDetailResponse"
+        ],
+        "invariants": [
+          "Exactly one profile version per user session must be marked as IsDefault",
+          "An unpublished profile version name is displayed as ProfileName + ' - ' + VersionName",
+          "Predicted profiles are excluded from normal listing unless includePredicted=true"
+        ],
+        "commands": [
+          {
+            "method": "GetProfileVersions(includePredicted)",
+            "raises": "ProfileVersionsListed"
+          },
+          {
+            "method": "GetProfileEntry(defaultProfileId, profileVersionId)",
+            "raises": "ProfileEntryResolved"
+          },
+          {
+            "method": "GetChannelProfileVersions()",
+            "raises": "ChannelProfilesListed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Content Engagement",
+      "responsibility": "Enables users to post questions, answers, and star-rated reviews on content, with permission enforcement and tenant-level masking of review/rating fields.",
+      "health": "partial",
+      "health_reason": "Permission gating occurs in the application service and settings-driven field masking (zeroing ratings, blanking review text) is applied correctly; however no domain events are raised for new engagement, and Discussion and Review share no common engagement abstraction.",
+      "key_operations": [
+        "DiscussionController.GetDiscussionsAsync",
+        "DiscussionController.AddQuestionAsync",
+        "DiscussionController.AddAnswerAsync",
+        "ReviewController.GetReviewsAsync",
+        "ReviewController.AddReviewAsync"
+      ],
+      "keywords": [
+        "discussion",
+        "question",
+        "answer",
+        "review",
+        "rating",
+        "contentVersionId",
+        "enableReview",
+        "enableRating"
+      ],
+      "aggregate": {
+        "class_name": "DiscussionResponse",
+        "identity": "ContentId + ContentVersionId",
+        "lifecycle": [
+          "Open",
+          "Answered"
+        ],
+        "value_objects": [
+          "ReviewRequest",
+          "DiscussionRequest"
+        ],
+        "child_entities": [
+          "ReviewResponse"
+        ],
+        "invariants": [
+          "A user must have permission on the associated profileVersion before accessing or posting engagement",
+          "When EnableRating is false, rating fields must be zeroed before returning to the client",
+          "When EnableReview is false, review title and content must be blanked before returning to the client"
+        ],
+        "commands": [
+          {
+            "method": "AddQuestion(profileVersionId, fileId, request)",
+            "raises": "QuestionPosted"
+          },
+          {
+            "method": "AddAnswer(profileVersionId, fileId, request)",
+            "raises": "AnswerPosted"
+          },
+          {
+            "method": "AddReview(profileVersionId, fileId, request)",
+            "raises": "ReviewSubmitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Subscription",
+      "responsibility": "Manages user follow/unfollow relationships for content profiles and individual file or folder items, served on both the DocCenter library and NewsCenter surfaces.",
+      "health": "anemic",
+      "health_reason": "FollowerService is a pure pass-through to ContentProfileServiceProvider; the only 'logic' is setting response.Ok=true and response.IsFolder=true, which are presentational concerns that belong in the mapper.",
+      "key_operations": [
+        "FollowerController.GetProfileFollowerAsync",
+        "FollowerController.AddProfileFollowerAsync",
+        "FollowerController.DeleteProfileFollowerAsync",
+        "FollowerController.GetFolderFollowerAsync",
+        "FollowerController.AddFolderFollowerAsync",
+        "FollowerController.DeleteFolderFollowerAsync",
+        "FollowerController.GetFileFollowerAsync",
+        "FollowerController.AddFileFollowerAsync",
+        "FollowerController.DeleteFileFollowerAsync",
+        "NewsCenter/FollowerController.GetItemFollowerAsync",
+        "NewsCenter/FollowerController.AddItemFollowerAsync",
+        "NewsCenter/FollowerController.DeleteItemFollowerAsync"
+      ],
+      "keywords": [
+        "profileVersionId",
+        "itemId",
+        "contentId",
+        "follower",
+        "subscribe",
+        "isFolder",
+        "newsCenter"
+      ],
+      "aggregate": {
+        "class_name": "ProfileFollowerResponse",
+        "identity": "UserId + TargetId (profileVersionId or itemId+contentId)",
+        "lifecycle": [
+          "Following",
+          "NotFollowing"
+        ],
+        "value_objects": [
+          "ItemFollowerResponse"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "A subscription target is exactly one of: profile version, folder item, or file item"
+        ],
+        "commands": [
+          {
+            "method": "FollowProfile(profileVersionId)",
+            "raises": "ProfileFollowed"
+          },
+          {
+            "method": "UnfollowProfile(profileVersionId)",
+            "raises": "ProfileUnfollowed"
+          },
+          {
+            "method": "FollowItem(profileVersionId, itemId, contentId)",
+            "raises": "ItemFollowed"
+          },
+          {
+            "method": "UnfollowItem(profileVersionId, itemId, contentId)",
+            "raises": "ItemUnfollowed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Content Augmentation",
+      "responsibility": "Produces watermarked download URLs and barcode-embedded multi-file download manifests, applying format eligibility rules, per-item permission checks, and graceful fallback to source blobs.",
+      "health": "partial",
+      "health_reason": "ContentAugmentationService contains real business logic (PPTX/PDF format gating, feature-flag-controlled barcoding path, fallback to source blob on augmentation failure); these rules are correct but in-lined in the application service rather than expressed as domain invariants.",
+      "key_operations": [
+        "WatermarkController.GetWatermarkedDownloadUrlAsync",
+        "BarcodeController.GetBarcodeMultiDownloadManifestsAsync",
+        "BlobController.GetMultiDownloadUrlAsync"
+      ],
+      "keywords": [
+        "watermark",
+        "barcode",
+        "blobId",
+        "downloadUrl",
+        "PPTX",
+        "PDF",
+        "multiDownload",
+        "signature",
+        "sourceBlobId",
+        "contentAugmentation"
+      ],
+      "aggregate": {
+        "class_name": "BarcodeMultiDownloadManifestResponse",
+        "identity": "ProfileVersionId + ordered RequestItems",
+        "lifecycle": [
+          "Pending",
+          "Augmented",
+          "FallbackToSource",
+          "Error"
+        ],
+        "value_objects": [
+          "BarcodeAugmentationRequest",
+          "WatermarkedDownloadUrlRequest",
+          "AugmentationStatus"
+        ],
+        "child_entities": [
+          "BarcodeMultiDownloadResponse"
+        ],
+        "invariants": [
+          "Barcode augmentation is only supported for PPTX and PDF formats",
+          "Every item in a multi-download manifest must pass individual permission check",
+          "If barcode augmentation fails, fall back to source blobId rather than failing the whole manifest"
+        ],
+        "commands": [
+          {
+            "method": "GetWatermarkedDownloadUrl(profileVersionId, fileId, request)",
+            "raises": "WatermarkedUrlGenerated"
+          },
+          {
+            "method": "GetBarcodeMultiDownloadManifests(profileVersionId, request)",
+            "raises": "BarcodeManifestGenerated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Universal Player",
+      "responsibility": "Generates streaming playback manifests for content, attaches viewer watermark data, proxies to the upstream player service, and produces a structured failed-manifest response on error.",
+      "health": "partial",
+      "health_reason": "Permission check and watermark application are present; however the service is a thin proxy with no domain model — request mutation (attaching watermarkData, resolving teamsiteId) is done imperatively in the application service.",
+      "key_operations": [
+        "UniversalPlayerController.GetUniversalPlayerManifestsAsync",
+        "UniversalPlayerController.GenerateFailedManifestResponseAsync"
+      ],
+      "keywords": [
+        "manifest",
+        "playback",
+        "watermark",
+        "teamsiteId",
+        "contentId",
+        "allowDownload",
+        "viewManifest",
+        "playerservice"
+      ],
+      "aggregate": {
+        "class_name": "ViewManifestResponse",
+        "identity": "ContentId + ViewerContext",
+        "lifecycle": [
+          "Requested",
+          "Generated",
+          "Failed"
+        ],
+        "value_objects": [
+          "UniversalPlayerRequest",
+          "RequestWatermarkData",
+          "ViewManifestPermissionsResponse"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "A playback manifest can only be generated if the user has permission on the associated profileVersion",
+          "Watermark data (application=DocCenter, viewerId) must be attached before forwarding to the player service"
+        ],
+        "commands": [
+          {
+            "method": "GetManifests(profileVersionId, fileId, request)",
+            "raises": "ManifestGenerated"
+          },
+          {
+            "method": "GenerateFailedManifest(request)",
+            "raises": "ManifestFailed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Content Location",
+      "responsibility": "Resolves the profile-scoped navigation path (profileVersionId, itemId, teamSiteId, redirectUrl) for a given contentId or shared-link, using a search-first with CPS fallback strategy.",
+      "health": "partial",
+      "health_reason": "LocationService contains meaningful fallback and default-profile resolution logic, but it is expressed as 200+ line conditional orchestration in a single method; analytics event dispatch (DiscIntake) is fired as an in-line side effect rather than via a domain event.",
+      "key_operations": [
+        "LocationController.GetContentLocationAsync",
+        "LocationController.GetFolderLocationAsync"
+      ],
+      "keywords": [
+        "contentId",
+        "sharedLinkId",
+        "profileVersionId",
+        "defaultProfileId",
+        "redirectUrl",
+        "contentLocation",
+        "folderLocation",
+        "searchFallback"
+      ],
+      "aggregate": {
+        "class_name": "ContentLocationResponse",
+        "identity": "ContentId",
+        "lifecycle": [
+          "Resolved",
+          "Redirected",
+          "NotFound",
+          "Forbidden"
+        ],
+        "value_objects": [
+          "FolderLocationResponse"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "A content location must belong to a profile version accessible to the current user",
+          "If search does not index the content, a CPS fallback must be attempted before raising NotFound",
+          "A URL-type content must trigger a Disc analytics event after successful resolution"
+        ],
+        "commands": [
+          {
+            "method": "GetContentLocation(contentId, profileVersionId)",
+            "raises": "ContentLocationResolved"
+          },
+          {
+            "method": "GetFolderLocation(sharedLinkId)",
+            "raises": "FolderLocationResolved"
+          }
+        ]
+      }
+    },
+    {
+      "name": "User",
+      "responsibility": "Provides user profile cards, group membership, user type classification, per-object permission validation across profiles/content/folders, and favorite file management for the current user.",
+      "health": "partial",
+      "health_reason": "UserService contains cross-cutting permission-check logic using ConcurrentBag + parallel tasks; user identity concerns are mixed with content-permission checks against CPS and Search. UserFavoriteFileService is a thin pass-through with no invariants.",
+      "key_operations": [
+        "UserController.GetUserPopupCardInfoAsync",
+        "UserController.GetGroupUsersAsync",
+        "UserController.GetCurrentUserTypeAsync",
+        "UserController.GetProfileUsersAsync",
+        "UserController.GetContentUsersAsync",
+        "UserController.GetFolderUsersAsync",
+        "UserFavoriteFileController.GetUserFavoriteFileAsync",
+        "UserFavoriteFileController.AddUserFavoriteFileAsync",
+        "UserFavoriteFileController.DeleteUserFavoriteFileAsync"
+      ],
+      "keywords": [
+        "userId",
+        "groupId",
+        "userType",
+        "favoriteFile",
+        "contentId",
+        "profilePermission",
+        "contentPermission",
+        "folderPermission",
+        "UserObjectStatus"
+      ],
+      "aggregate": {
+        "class_name": "UserObjectResponse",
+        "identity": "UserId",
+        "lifecycle": [
+          "Active",
+          "Inactive"
+        ],
+        "value_objects": [
+          "UserPopupCardDetailResponse",
+          "UserTypeResponse",
+          "UserFavoriteFileResponse"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "A user's access status to a target object is exactly one of: Ok, NoPermission, or Unknown",
+          "Permission for profile access is validated via CPS; permission for content/folder access is validated via Search index"
+        ],
+        "commands": [
+          {
+            "method": "GetProfileUsers(profileVersionId, userIds)",
+            "raises": "UsersPermissionChecked"
+          },
+          {
+            "method": "AddFavorite(profileVersionId, fileId, contentId)",
+            "raises": "FavoriteAdded"
+          },
+          {
+            "method": "DeleteFavorite(contentId)",
+            "raises": "FavoriteRemoved"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Custom Property",
+      "responsibility": "Retrieves content-level and team-site-level custom metadata properties, filtering to DocCenter-visible properties only.",
+      "health": "anemic",
+      "health_reason": "CustomPropertyService contains only one business rule (IsVisibleInDocCenter filter) expressed as a LINQ clause rather than a domain concept; all other logic is provider delegation.",
+      "key_operations": [
+        "CustomPropertyController.GetTeamSiteCustomPropertiesAsync",
+        "CustomPropertyController.GetCustomPropertiesAsync",
+        "CustomPropertyController.GetTenantCustomPropertiesAsync"
+      ],
+      "keywords": [
+        "customProperty",
+        "teamSiteId",
+        "contentId",
+        "isVisibleInDocCenter",
+        "tenantCustomProperty"
+      ],
+      "aggregate": {
+        "class_name": "TeamSiteCustomPropertyResponse",
+        "identity": "TeamSiteId",
+        "lifecycle": [
+          "Active"
+        ],
+        "value_objects": [
+          "ContentCustomPropertyResponse",
+          "TenantCustomPropertyResponse"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "Only custom properties with IsVisibleInDocCenter=true are exposed to the client"
+        ],
+        "commands": [
+          {
+            "method": "GetCustomProperties(profileVersionId, fileId, contentId)",
+            "raises": "CustomPropertiesRetrieved"
+          },
+          {
+            "method": "GetTenantCustomProperties()",
+            "raises": "TenantCustomPropertiesRetrieved"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Feature Flag",
+      "responsibility": "Evaluates tenant- and user-scoped feature toggles from LaunchDarkly and the FMS feature management service, exposing barcoding, meeting ingestion, and navigation capabilities.",
+      "health": "anemic",
+      "health_reason": "FeatureService is a pure delegation facade over LaunchDarklyServiceProvider and FeatureFlagAccessor; all evaluation logic lives in the infrastructure providers.",
+      "key_operations": [
+        "FeatureController (all endpoints)",
+        "ToggleController (all endpoints)"
+      ],
+      "keywords": [
+        "LaunchDarkly",
+        "featureFlag",
+        "toggle",
+        "barcoding",
+        "meetingIngestion",
+        "doccenterNavigation",
+        "FMS",
+        "RuleAction"
+      ],
+      "aggregate": {
+        "class_name": "FeatureAccessRule",
+        "identity": "FeatureInfoKey + FeatureType",
+        "lifecycle": [
+          "Enabled",
+          "Disabled"
+        ],
+        "value_objects": [
+          "LaunchDarklyToggle",
+          "RuleAction"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "Feature evaluation falls back to LaunchDarkly when no FMS rule is present for the given key"
+        ],
+        "commands": [
+          {
+            "method": "IsEnabled(project, toggle, defaultValue)",
+            "raises": "FeatureEvaluated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Pre-Load Data",
+      "responsibility": "Assembles a bundled payload of profile, folder, file, and settings data for the DocCenter initial page load, using in-process single-flight coalescing to prevent cache stampede on concurrent first requests.",
+      "health": "anemic",
+      "health_reason": "PreLoadDataService is a read-side view assembler with caching infrastructure; the single-flight pattern (ConcurrentDictionary<Lazy<Task>>) is a valuable invariant but is infrastructure plumbing rather than domain logic.",
+      "key_operations": [
+        "PreLoadDataController (all endpoints)"
+      ],
+      "keywords": [
+        "preLoadData",
+        "singleFlight",
+        "cacheCoalescing",
+        "initialLoad",
+        "profileVersionId",
+        "NoRedirectSentinel",
+        "NoVariantSentinel"
+      ],
+      "aggregate": {
+        "class_name": "PreLoadDataResponse",
+        "identity": "ProfileVersionId + FullPathId + TenantId + UserId",
+        "lifecycle": [
+          "Pending",
+          "Loaded",
+          "Cached"
+        ],
+        "value_objects": [
+          "PreLoadDataRequest"
+        ],
+        "child_entities": [],
+        "invariants": [
+          "Concurrent requests for the same pre-load cache key must coalesce into a single upstream call",
+          "A Redis sentinel value distinguishes 'confirmed no redirect' from a transient failure (which must not be cached)"
+        ],
+        "commands": [
+          {
+            "method": "GetPreLoadData(request)",
+            "raises": "PreLoadDataAssembled"
+          }
+        ]
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "name": "View Content Detail (Primary Load)",
+      "domain_sequence": [
+        "Content Profile",
+        "File",
+        "Feature Flag",
+        "Folder Navigation"
+      ],
+      "steps": [
+        {
+          "label": "Decode double-encoded fullPathId from client",
+          "type": "domain"
+        },
+        {
+          "label": "Redis cache lookup for ContentDetail by profileVersionId+fullPathId+tenant+userId",
+          "type": "domain"
+        },
+        {
+          "label": "GET file current version from Monolith (legacy bridge)",
+          "type": "external"
+        },
+        {
+          "label": "GET full ContentDetail from ContentProfileService",
+          "type": "api"
+        },
+        {
+          "label": "Parallel: GET file extra from ContentManagerService",
+          "type": "api"
+        },
+        {
+          "label": "Parallel: GET file variants from ContentManagerService (LD-gated)",
+          "type": "api"
+        },
+        {
+          "label": "Parallel: GET DocCenter settings from DeclarativeAdminSettingsService",
+          "type": "api"
+        },
+        {
+          "label": "Parallel: Evaluate ShowDoccenterNavigation toggle (LaunchDarkly/Matrix)",
+          "type": "api"
+        },
+        {
+          "label": "Parallel: GET username from UserManagementService",
+          "type": "api"
+        },
+        {
+          "label": "Merge file extra — apply rating masking, navigation flag",
+          "type": "domain"
+        },
+        {
+          "label": "GET freestyle slide info from ContentManagerService (PPTX/GSLIDES only)",
+          "type": "api"
+        },
+        {
+          "label": "GET page storage data from PageStorageService (supported formats only)",
+          "type": "api"
+        },
+        {
+          "label": "GET content permissions from ContentManagerService",
+          "type": "api"
+        },
+        {
+          "label": "Assemble and cache ContentDetailResponse in Redis",
+          "type": "domain"
+        }
+      ],
+      "has_violations": true
+    },
+    {
+      "name": "Resolve Content Location (Universal Link)",
+      "domain_sequence": [
+        "Content Location",
+        "Content Profile",
+        "User"
+      ],
+      "steps": [
+        {
+          "label": "GET user default profile from UserManagementService",
+          "type": "api"
+        },
+        {
+          "label": "Search index lookup via SearchService",
+          "type": "api"
+        },
+        {
+          "label": "Backfill default profile info onto search result",
+          "type": "domain"
+        },
+        {
+          "label": "Fallback: GET published profile versions from ContentProfileService",
+          "type": "api"
+        },
+        {
+          "label": "Fallback: GET user-accessible profiles from ContentProfileService",
+          "type": "api"
+        },
+        {
+          "label": "Fallback: GET content location from ContentProfileService",
+          "type": "api"
+        },
+        {
+          "label": "URL-encode redirect URL",
+          "type": "domain"
+        },
+        {
+          "label": "POST content view event to DiscIntake (analytics side-effect)",
+          "type": "external"
+        }
+      ],
+      "has_violations": true
+    },
+    {
+      "name": "Barcode Multi-Download",
+      "domain_sequence": [
+        "Content Augmentation",
+        "Feature Flag",
+        "Content Profile"
+      ],
+      "steps": [
+        {
+          "label": "Evaluate barcoding and meeting-ingestion feature flags",
+          "type": "api"
+        },
+        {
+          "label": "GET teamSiteId from ContentProfileService",
+          "type": "api"
+        },
+        {
+          "label": "For each item: check user permission via ContentProfileService",
+          "type": "api"
+        },
+        {
+          "label": "For eligible PPTX/PDF items: GET barcode blobId from ContentAugmentationService",
+          "type": "api"
+        },
+        {
+          "label": "On augmentation error: fall back to source blobId",
+          "type": "domain"
+        },
+        {
+          "label": "GET signed multi-download URL from BlobStorageService",
+          "type": "api"
+        }
+      ],
+      "has_violations": false
+    },
+    {
+      "name": "Universal Player Manifest",
+      "domain_sequence": [
+        "Universal Player",
+        "File"
+      ],
+      "steps": [
+        {
+          "label": "Check user permission via ContentProfileService",
+          "type": "api"
+        },
+        {
+          "label": "Resolve teamsiteId from ContentManagerService if missing in request",
+          "type": "api"
+        },
+        {
+          "label": "Attach watermark data (application=DocCenter, viewerId)",
+          "type": "domain"
+        },
+        {
+          "label": "Proxy streaming request to UniversalPlayerService",
+          "type": "api"
+        }
+      ],
+      "has_violations": false
+    },
+    {
+      "name": "Browse Folder Children",
+      "domain_sequence": [
+        "Content Profile",
+        "Folder Navigation",
+        "File"
+      ],
+      "steps": [
+        {
+          "label": "GET children listing from ContentProfileService via ChildrenAllReFillerManager",
+          "type": "api"
+        },
+        {
+          "label": "For each child file: GET file extra from ContentManagerService",
+          "type": "api"
+        },
+        {
+          "label": "For each child file: generate thumbnail URL from BlobStorageService",
+          "type": "api"
+        },
+        {
+          "label": "Assemble enriched ChildrenResponse",
+          "type": "domain"
+        }
+      ],
+      "has_violations": false
+    },
+    {
+      "name": "Follow / Unfollow Profile or Item",
+      "domain_sequence": [
+        "Subscription",
+        "Content Profile"
+      ],
+      "steps": [
+        {
+          "label": "Add/Delete/Get follower record via ContentProfileService",
+          "type": "api"
+        },
+        {
+          "label": "Set response.Ok = true (presentational logic in domain service)",
+          "type": "violation"
+        },
+        {
+          "label": "Set response.IsFolder = true for folder targets (presentational logic in domain service)",
+          "type": "violation"
+        }
+      ],
+      "has_violations": true
+    }
+  ],
+  "gap_analysis": [
+    {
+      "title": "No domain entities — all services operate on DTO response objects",
+      "detail": "The Core project contains zero Entity, Aggregate, or Value Object classes. FileService, DiscussionService, ReviewService, and every other service operate directly on *Response DTOs (FileResponse, DiscussionResponse) which are output models, not domain models. Business invariants ('user must have permission', 'rating must be 0 when disabled') are enforced as raw if-blocks in application service methods rather than as methods on an aggregate. Every service is a transaction script.\n\nBefore (DiscussionService):\n  if (permissionCheckTask.Result)\n      return discussionTask.Result;\n  else\n      throw new SeismicForbiddenFileException(...);\n\nAfter:\n  public class DiscussionThread {\n    public void AssertViewerHasAccess(bool hasPermission) {\n      if (!hasPermission) throw new SeismicForbiddenFileException(...);\n    }\n  }",
+      "file": "DiscussionService.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "title": "ContentDetailService: 400-line god-method orchestrating 7+ providers",
+      "detail": "ContentDetailService.GetContentDetailAsync coordinates 7 concurrent provider calls, applies conditional rating masking (a business rule), merges file extra info via FileHelper, and conditionally fetches PageStorage based on file format. This is domain policy expressed as infrastructure plumbing. The 'rating=0 when disabled' and 'navigation flag' rules belong on the File aggregate.\n\nBefore:\n  if (!doccenterSettingResponse.EnableRating.Value)\n      extraFileResponse.Rating = 0;\n  _fileHelper.MergeExtendInfo(contentDetailResponse.File, extraFileResponse, showNavigation, fileVariants);\n\nAfter:\n  file.ApplyTenantSettings(doccenterSetting); // domain method on FileEntity",
+      "file": "ContentDetailService.cs",
+      "severity": "P0",
+      "category": "Anemic model"
+    },
+    {
+      "title": "FolderService directly instantiates ChildrenAllReFillerManager (new keyword)",
+      "detail": "FolderService creates a ChildrenAllReFillerManager via 'new' inside its constructor, passing through all injected dependencies manually. This is a layer violation: the application service acts as a factory for a concrete infrastructure class, and the dependency cannot be mocked in unit tests.\n\nBefore:\n  public FolderService(...) {\n    _childrenAllReFillerManager = new ChildrenAllReFillerManager(\n      profileProvider, contentManagerServiceProvider, blobStorageServiceProvider, environmentProvider, logger);\n  }\n\nAfter:\n  public FolderService(IChildrenAllReFillerManager childrenAllReFillerManager, ...) {\n    _childrenAllReFillerManager = childrenAllReFillerManager;\n  }",
+      "file": "FolderService.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "title": "Blocking async calls inside Parallel.ForEach in ProfileService",
+      "detail": "ProfileService.GetProfileEntriesAsync uses Parallel.ForEach with .GetAwaiter().GetResult() to call async BlobStorageServiceProvider methods. This blocks thread-pool threads and can cause deadlocks or thread-pool exhaustion under ASP.NET synchronization context at scale.\n\nBefore:\n  Parallel.ForEach(profiles, new ParallelOptions { MaxDegreeOfParallelism = 10 }, profile => {\n    profile.ThumbnailRelativePathWithSignature = _blobStorageServiceProvider\n      .GenerateThumbnailRelativePathWithSignatureAsync(profile.ThumbnailId).GetAwaiter().GetResult();\n  });\n\nAfter:\n  var tasks = profiles.Select(async p => {\n    p.ThumbnailRelativePathWithSignature = await _blobStorageServiceProvider\n      .GenerateThumbnailRelativePathWithSignatureAsync(p.ThumbnailId);\n  });\n  await Task.WhenAll(tasks);",
+      "file": "ProfileService.cs",
+      "severity": "P0",
+      "category": "Layer violation"
+    },
+    {
+      "title": "All domain identifiers are untyped strings — no value objects",
+      "detail": "ContentId, ProfileVersionId, TeamSiteId, VersionId, ItemId, and FullPathId are all raw strings throughout the codebase. There is no compile-time safety preventing passing a ContentId where a VersionId is expected. The 'lf' prefix file-detection logic is duplicated in both ItemService and ContentDetailService and should live in a FullPathId value object.\n\nBefore (duplicated in 2 services):\n  private const string LIBRARY_CONTENT_PREFIX = \"lf\";\n  return lastId.StartsWith(LIBRARY_CONTENT_PREFIX);\n\nAfter:\n  public record FullPathId(string Value) {\n    public bool IsFile => Value.Split('/').Last(s => !string.IsNullOrEmpty(s)).StartsWith(\"lf\");\n  }",
+      "file": "ItemService.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "title": "No domain events raised for state-changing operations",
+      "detail": "User follows a profile, adds a review, favorites a file, resolves a content location — none of these raise a domain event. Side effects (e.g., the Disc analytics HTTP POST in LocationService) are fired imperiously via direct provider calls inside the application service, creating tight coupling between the location-resolution flow and analytics infrastructure.\n\nMissing events: ProfileFollowed, ProfileUnfollowed, ItemFollowed, ItemUnfollowed, ReviewSubmitted, FavoriteAdded, FavoriteRemoved, ContentLocationResolved.",
+      "file": "FollowerService.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "title": "Presentational logic (Ok, IsFolder flags) in domain layer",
+      "detail": "FollowerService sets response.Ok = true and response.IsFolder = true directly on domain response objects. These are API presentation concerns — the domain layer should not know about client-facing 'ok' status fields or shape discriminators. These should be set in MapperService or the controller.\n\nBefore:\n  response.Ok = true;\n  response.IsFolder = true;\n  return response;\n\nAfter: Remove from FollowerService; set in MapperService when mapping FollowerResponse → FollowerResource.",
+      "file": "FollowerService.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "title": "Typos in public interface names baked into DI registration",
+      "detail": "IProflieService (should be IProfileService) and IFolderServcie (should be IFolderService) are typos registered in DI and referenced in every consuming controller. They indicate the interfaces were never corrected after initial creation and reduce discoverability.",
+      "file": "IProflieService.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "title": "Large commented-out code blocks in production service files",
+      "detail": "ContentDetailService, UniversalPlayerService, LocationService, and ProfileService all contain multi-line blocks of commented-out code representing old implementations or disabled logic. These obscure the active code path and increase cognitive load; git history preserves the original intent.",
+      "file": "ContentDetailService.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "title": "ChildrenAllReFillerManager is an unclassified orchestration utility in the domain layer",
+      "detail": "Core/ReFillers/ChildrenAllReFillerManager directly coordinates calls to ContentProfileServiceProvider, ContentManagerServiceProvider, and BlobStorageServiceProvider. It is not an application service, domain service, or provider — it is infrastructure orchestration living in the domain layer, bypassing the boundary that IContentProfileServiceProvider is meant to enforce.",
+      "file": "FolderService.cs",
+      "severity": "P2",
+      "category": "Layer violation"
+    }
+  ]
+}

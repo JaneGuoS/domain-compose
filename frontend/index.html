@@ -696,25 +696,68 @@ function AggregateDiagram({data,highlightId}){
   const LEFT=80, TOP=52;
   const W=LEFT+INNER_W+LEFT+120; // +120 for Kafka labels on right
 
-  // ── RELATIONSHIPS: explicit workflow sequences only ───────────────────────
-  const relMap={};
-  (data.workflows||[]).forEach(wf=>{
-    const doms=(wf.domains||[]).filter(id=>pos[id]);
-    const hasVio=wf.steps?.some(s=>s.type==='violation');
-    for(let i=0;i<doms.length-1;i++){
-      const key=doms[i]+'→'+doms[i+1];
-      if(relMap[key])continue;
-      const steps=wf.steps||[];
-      const evtStep=steps.find(s=>s.type==='kafka');
-      const rawLabel=evtStep?evtStep.label
-        .replace(/^[←→]\s*(Kafka\s*)?(OUT|IN|out|in):\s*/i,'')
-        .replace(/^eventbus\.[^.]+\.[^.]+\./,'')
-        .replace(/^SearchProducer\s*→\s*/,'')
-        .slice(0,22):'';
-      relMap[key]={from:doms[i],to:doms[i+1],label:rawLabel,vio:hasVio,wfName:wf.name};
+  // ── RELATIONSHIPS: from domain map relationships[] only (never from workflows) ─
+  // Relationship types and their visual style:
+  //   child-of   → purple solid ◆──►  (composition: child cannot exist without parent)
+  //   references → blue solid ──►     (association: optional FK)
+  //   guarded-by → amber dashed - -►  (permission check before mutation)
+  //   notifies   → green solid ──►    (domain event published to another aggregate)
+  //   coordinates→ teal solid ◄──►    (domain service coordinates both)
+  //   depends-on → grey dotted ···►   (reads from another aggregate's read model)
+  const REL_STYLE={
+    'child-of':   {color:'#7c3aed',dash:'none',  marker:'m-child',  width:2},
+    'references': {color:'#2563eb',dash:'none',  marker:'m-ref',    width:1.5},
+    'guarded-by': {color:'#d97706',dash:'5,3',   marker:'m-guard',  width:1.5},
+    'notifies':   {color:'#059669',dash:'none',  marker:'m-notify', width:1.8},
+    'coordinates':{color:'#0891b2',dash:'none',  marker:'m-coord',  width:1.5},
+    'depends-on': {color:'#9ca3af',dash:'2,3',   marker:'m-dep',    width:1.5},
+  };
+  const DEFAULT_STYLE={color:'#94a3b8',dash:'none',marker:'m-ref',width:1.5};
+
+  // Use data.relationships if present; fall back to deriving from workflows for
+  // legacy JSON files that predate the domain-analysis skill output.
+  let rels=[];
+  if((data.relationships||[]).length>0){
+    rels=(data.relationships||[])
+      .filter(r=>pos[r.from]!=null&&pos[r.to]!=null)
+      .map(r=>({
+        from:r.from, to:r.to,
+        type:r.type||'references',
+        label:(r.field||r.description||'').replace(/\s*[—–(].*/,'').trim().slice(0,20),
+        description:r.description||''
+      }));
+  } else {
+    // Legacy fallback: derive from workflows with fuzzy domain ID resolution.
+    // Workflow domain IDs may differ from actual domain IDs (e.g. "file-versioning"
+    // vs "file") due to analysis pipeline inconsistency. Resolve by:
+    // 1. Exact match, 2. Prefix match, 3. Keyword overlap in name.
+    const actualIds=aggs.map(d=>({id:d.id,name:(d.name||'').toLowerCase()}));
+    function resolveId(wfId){
+      if(pos[wfId]!=null)return wfId; // exact match
+      const wfWords=wfId.toLowerCase().split(/[-_]/);
+      // prefix: actual id starts with the first word of workflow id
+      let best=actualIds.find(a=>a.id.startsWith(wfWords[0]));
+      if(best&&pos[best.id]!=null)return best.id;
+      // keyword: actual name contains any word from workflow id
+      best=actualIds.find(a=>wfWords.some(w=>w.length>3&&(a.id.includes(w)||a.name.includes(w))));
+      if(best&&pos[best.id]!=null)return best.id;
+      return null;
     }
-  });
-  const rels=Object.values(relMap);
+    const relMap={};
+    (data.workflows||[]).forEach(wf=>{
+      const doms=(wf.domains||[]).map(resolveId).filter(Boolean);
+      // deduplicate consecutive identical IDs after resolution
+      const deduped=doms.filter((id,i)=>i===0||id!==doms[i-1]);
+      for(let i=0;i<deduped.length-1;i++){
+        const key=deduped[i]+'→'+deduped[i+1];
+        if(relMap[key])continue;
+        const evtStep=(wf.steps||[]).find(s=>s.type==='kafka');
+        const rawLabel=evtStep?evtStep.label.replace(/^[←→]\s*(Kafka\s*)?(OUT|IN):\s*/i,'').replace(/^eventbus\.[^.]+\.[^.]+\./,'').slice(0,20):'';
+        relMap[key]={from:deduped[i],to:deduped[i+1],type:'references',label:rawLabel,description:wf.name};
+      }
+    });
+    rels=Object.values(relMap);
+  }
 
   const kafkaIn=bc.consumes||[], kafkaOut=bc.publishes||[], http=bc.dependsOn||[];
   const svgH=TOP+INNER_H+180; // bottom space for HTTP deps + legend
@@ -848,16 +891,33 @@ function AggregateDiagram({data,highlightId}){
       h('span',{style:{fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'.07em'}},
         'Aggregate Context Diagram'),
       h('span',{style:{fontSize:10,color:'#94a3b8'}},
-        '— relationships from explicit workflow sequences · DDD UML notation')
+        data.relationships?.length>0
+          ?'— relationships from domain model (FK fields, events, permissions)'
+          :'— relationships derived from workflows (run domain-analysis for accurate model)'
+      )
     ),
     h('svg',{viewBox:`0 0 ${W} ${svgH}`,xmlns:'http://www.w3.org/2000/svg',
       style:{width:'100%',minWidth:620,display:'block',fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif'}},
 
       h('defs',null,
-        h('marker',{id:'m-ev',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
-          h('polygon',{points:'0 0,8 3,0 6',fill:'#f59e0b'})),
-        h('marker',{id:'m-vi',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
-          h('polygon',{points:'0 0,8 3,0 6',fill:'#ef4444'}))
+        // Open arrowhead (references, depends-on)
+        h('marker',{id:'m-ref',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'none',stroke:'#2563eb',strokeWidth:1})),
+        // Filled arrow (child-of — purple)
+        h('marker',{id:'m-child',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#7c3aed'})),
+        // Filled arrow (guarded-by — amber)
+        h('marker',{id:'m-guard',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#d97706'})),
+        // Filled arrow (notifies — green)
+        h('marker',{id:'m-notify',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#059669'})),
+        // Filled arrow (coordinates — teal)
+        h('marker',{id:'m-coord',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#0891b2'})),
+        // Grey dot (depends-on)
+        h('marker',{id:'m-dep',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#9ca3af'}))
       ),
 
       // Bounded context dashed background
@@ -870,19 +930,18 @@ function AggregateDiagram({data,highlightId}){
       ...rels.map(rel=>{
         const route=routeArrow(rel.from,rel.to);
         if(!route)return null;
-        const color=rel.vio?'#ef4444':'#f59e0b';
-        const marker=rel.vio?'m-vi':'m-ev';
-        const dash=rel.vio?'6,3':'none';
-        return h('g',{key:rel.from+'→'+rel.to},
-          h('path',{d:route.path,fill:'none',stroke:color,strokeWidth:1.8,
-            strokeDasharray:dash,markerEnd:`url(#${marker})`}),
-          rel.label&&h('g',null,
-            h('rect',{x:route.lx-rel.label.length*2.8-2,y:route.ly-18,
-              width:rel.label.length*5.4+4,height:12,rx:3,fill:'#ffffffef',stroke:color+'44'}),
+        const style=REL_STYLE[rel.type]||DEFAULT_STYLE;
+        const label=rel.label||'';
+        return h('g',{key:rel.from+'→'+rel.to+'→'+rel.type},
+          h('path',{d:route.path,fill:'none',stroke:style.color,strokeWidth:style.width,
+            strokeDasharray:style.dash,markerEnd:`url(#${style.marker})`}),
+          label&&h('g',null,
+            h('rect',{x:route.lx-label.length*2.8-2,y:route.ly-18,
+              width:label.length*5.4+4,height:12,rx:3,fill:'#ffffffef',stroke:style.color+'55'}),
             h('text',{x:route.lx,y:route.ly-8,textAnchor:'middle',
-              fontSize:8,fill:color,fontWeight:600},rel.label)
+              fontSize:7.5,fill:style.color,fontWeight:600},label)
           ),
-          h('title',null,rel.wfName)
+          h('title',null,`${rel.type}: ${rel.description||rel.label||''}`)
         );
       }),
 
@@ -930,10 +989,16 @@ function AggregateDiagram({data,highlightId}){
 
       // ── LEGEND ─────────────────────────────────────────────────────────────
       h('g',{transform:`translate(${LEFT-12},${svgH-16})`},
-        h('line',{x1:0,y1:5,x2:16,y2:5,stroke:'#f59e0b',strokeWidth:1.8,markerEnd:'url(#m-ev)'}),
-        h('text',{x:20,y:9,fontSize:8,fill:'#64748b'},'Domain event flow (workflow sequence)'),
-        h('line',{x1:230,y1:5,x2:246,y2:5,stroke:'#ef4444',strokeWidth:1.8,strokeDasharray:'5,2',markerEnd:'url(#m-vi)'}),
-        h('text',{x:250,y:9,fontSize:8,fill:'#64748b'},'Workflow with DDD violation')
+        h('line',{x1:0,y1:5,x2:16,y2:5,stroke:'#7c3aed',strokeWidth:2,markerEnd:'url(#m-child)'}),
+        h('text',{x:20,y:9,fontSize:8,fill:'#64748b'},'child-of (composition)'),
+        h('line',{x1:130,y1:5,x2:146,y2:5,stroke:'#2563eb',strokeWidth:1.5,markerEnd:'url(#m-ref)'}),
+        h('text',{x:150,y:9,fontSize:8,fill:'#64748b'},'references'),
+        h('line',{x1:220,y1:5,x2:236,y2:5,stroke:'#d97706',strokeWidth:1.5,strokeDasharray:'5,3',markerEnd:'url(#m-guard)'}),
+        h('text',{x:240,y:9,fontSize:8,fill:'#64748b'},'guarded-by'),
+        h('line',{x1:320,y1:5,x2:336,y2:5,stroke:'#059669',strokeWidth:1.8,markerEnd:'url(#m-notify)'}),
+        h('text',{x:340,y:9,fontSize:8,fill:'#64748b'},'notifies (event)'),
+        h('line',{x1:430,y1:5,x2:446,y2:5,stroke:'#9ca3af',strokeWidth:1.5,strokeDasharray:'2,3',markerEnd:'url(#m-dep)'}),
+        h('text',{x:450,y:9,fontSize:8,fill:'#64748b'},'depends-on')
       )
     )
   );
