@@ -180,31 +180,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#9AA7B4;margin-bottom:14px}
 
 /* DOMAIN GRID */
-.domain-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
-.dc{background:#fff;border:1.5px solid #E5E5E5;border-radius:10px;padding:12px;transition:all .25s;cursor:pointer;overflow:hidden;min-width:0}
+.domain-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;align-items:start}
+.dc{background:#fff;border:1.5px solid #E5E5E5;border-radius:10px;padding:10px;transition:all .25s;cursor:pointer;overflow:hidden;min-width:0;word-break:break-word;height:130px}
 .dc:hover{border-color:#D0DCF0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .dc.selected{border-color:#F15A24;box-shadow:0 0 0 3px rgba(241,90,36,.12)}
 .dc.d-direct{border-color:#EF5350;background:#FFF5F5;transform:translateY(-2px);box-shadow:0 0 0 3px rgba(239,83,80,.12)}
 .dc.d-indirect{border-color:#FFC107;background:#FFFDE7}
 .dc.d-none{opacity:.4}
-.dc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-width:0}
+.dc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-width:0;overflow:hidden}
 .dc-icon{font-size:18px;flex-shrink:0}
 .dc-name{font-size:12px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dc-ibadge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;white-space:nowrap}
 .dc-ibadge.direct{background:#FFEBEE;color:#C62828}
 .dc-ibadge.indirect{background:#FFF8E1;color:#7A5000}
 .dc-health{font-size:10px;color:#9AA7B4;margin-bottom:6px}
-.dc-ops{list-style:none;display:flex;flex-direction:column;gap:2px}
-.dc-ops li{font-size:10.5px;color:#5B6F8A;padding-left:10px;position:relative;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-ops{list-style:none;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.dc-ops li{font-size:10.5px;color:#5B6F8A;padding-left:10px;position:relative;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .dc-ops li::before{content:'·';position:absolute;left:0;color:#D0DCF0}
 .dc-ops li.op-hit{color:#C62828;font-weight:600}
 .dc-ops li.op-hit::before{color:#EF5350}
 .dc-ops li.op-more{color:#C0C8D4;font-style:italic}
 
-/* EDIT BUTTON on domain card */
-.dc-edit-btn{opacity:0;pointer-events:none;background:none;border:none;cursor:pointer;font-size:13px;padding:2px 5px;border-radius:4px;color:#6B7280;line-height:1;flex-shrink:0;transition:opacity .15s,background .15s,color .15s}
-.dc:hover .dc-edit-btn{opacity:1;pointer-events:auto}
-.dc-edit-btn:hover{background:#EEF2FF;color:#4F46E5}
+/* Edit button — always visible text button, no icon */
+.dc-edit-btn{background:none;border:1px solid #E5E7EB;cursor:pointer;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;color:#6366F1;flex-shrink:0;transition:background .15s,border-color .15s;white-space:nowrap}
+.dc-edit-btn:hover{background:#EEF2FF;border-color:#6366F1}
 .dc-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:none;border:1.5px dashed #C8D0DC;border-radius:10px;padding:12px;cursor:pointer;min-height:90px;transition:border-color .2s,background .2s}
 .dc-add:hover{border-color:#6366F1;background:#F5F3FF}
 .dc-add-icon{font-size:22px;color:#9AA7B4}
@@ -256,6 +255,46 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .dem-btn-danger:hover{background:#B91C1C}
 .dem-btn-dg{background:none;color:#DC2626;border-color:transparent;margin-right:auto}
 .dem-btn-dg:hover{background:#FEF2F2}
+
+/* INLINE DOMAIN CARD EDIT */
+.dc.dc-editing{border-color:#6366F1;box-shadow:0 0 0 3px rgba(99,102,241,.15);background:#FAFAFE;cursor:default;overflow-x:hidden;overflow-y:auto;height:auto;max-height:80vh;grid-column:span 2;align-self:start}
+.dce-hdr{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.dce-name-lbl{flex:1;font-size:13px;font-weight:700;color:#1E1B3C;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dce-field{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;flex:1;min-width:0}
+.dce-lbl{font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;display:block}
+.dce-hint{font-size:9px;font-weight:400;color:#9CA3AF;text-transform:none}
+.dce-inp{border:1.5px solid #E5E7EB;border-radius:6px;padding:5px 8px;font-size:12px;color:#1E1B3C;background:#fff;width:100%;box-sizing:border-box}
+.dce-inp:focus{outline:none;border-color:#6366F1}
+.dce-sel{border:1.5px solid #E5E7EB;border-radius:6px;padding:5px 8px;font-size:12px;color:#1E1B3C;background:#fff;cursor:pointer;width:100%;box-sizing:border-box}
+.dce-sel:focus{outline:none;border-color:#6366F1}
+.dce-ta{border:1.5px solid #E5E7EB;border-radius:6px;padding:6px 8px;font-size:12px;color:#1E1B3C;background:#fff;resize:vertical;width:100%;box-sizing:border-box;font-family:monospace;line-height:1.5}
+.dce-ta:focus{outline:none;border-color:#6366F1}
+.dce-ta-sm{resize:none}
+.dce-sec-title{font-size:10px;font-weight:700;color:#6366F1;text-transform:uppercase;letter-spacing:.08em;border-top:1px solid #E0E7FF;padding-top:8px;margin-bottom:8px}
+.dce-row{display:flex;gap:8px;overflow:hidden;min-width:0}
+.dce-cmd-row{display:flex;align-items:center;gap:4px;margin-bottom:4px}
+.dce-inp-cmd{flex:1;min-width:0}
+.dce-cmd-arrow{font-size:11px;color:#9CA3AF;flex-shrink:0}
+.dce-cmd-rm{background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:11px;padding:2px 4px;border-radius:3px}
+.dce-cmd-rm:hover{background:#FEE2E2;color:#EF4444}
+.dce-add-cmd{font-size:11px;color:#6366F1;background:none;border:none;cursor:pointer;padding:4px 0;font-weight:600}
+.dce-add-cmd:hover{text-decoration:underline}
+.dce-ftr{display:flex;align-items:center;border-top:1px solid #EEF1F5;padding-top:10px;margin-top:4px;gap:6px;flex-wrap:wrap}
+.dce-ftr-r{display:flex;gap:6px;margin-left:auto}
+.dce-confirm{display:flex;align-items:center;gap:6px;font-size:11px;color:#374151}
+.dce-btn{padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.dce-primary{background:#4F46E5;color:#fff}
+.dce-primary:hover{background:#4338CA}
+.dce-ghost{background:#F3F4F6;color:#374151;border:1.5px solid #E5E7EB}
+.dce-ghost:hover{background:#E5E7EB}
+.dce-btn-danger{background:#DC2626;color:#fff}
+.dce-btn-danger:hover{background:#B91C1C}
+.dce-btn-dg{background:none;color:#DC2626;border:1.5px solid #FCA5A5}
+.dce-btn-dg:hover{background:#FEF2F2}
+.dce-btn-save{background:#D1FAE5;color:#065F46;font-size:13px;padding:4px 8px;border-radius:5px;border:none;cursor:pointer}
+.dce-btn-save:hover{background:#A7F3D0}
+.dce-btn-cancel{background:#F3F4F6;color:#6B7280;font-size:13px;padding:4px 8px;border-radius:5px;border:none;cursor:pointer}
+.dce-btn-cancel:hover{background:#E5E7EB}
 
 /* DOMAIN DETAIL PANEL */
 .detail-panel{background:#fff;border:1.5px solid #E5E5E5;border-radius:12px;padding:20px;margin-bottom:24px}
@@ -357,8 +396,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .ctx-map-hdr{display:flex;align-items:center;gap:12px;margin-bottom:14px}
 
 /* ── INLINE EDITING ── */
-.agg-edit-btn{margin-left:auto;padding:2px 8px;border:1px solid rgba(255,255,255,.35);border-radius:4px;background:rgba(255,255,255,.12);color:#fff;font-size:10px;cursor:pointer;font-weight:700;transition:background .15s}
-.agg-edit-btn:hover{background:rgba(255,255,255,.28)}
+.agg-edit-btn{margin-left:auto;padding:2px 8px;border:1px solid #E5E7EB;border-radius:4px;background:none;color:#6366F1;font-size:10px;cursor:pointer;font-weight:600;transition:background .15s,border-color .15s}
+.agg-edit-btn:hover{background:#EEF2FF;border-color:#6366F1}
 .agg-edit-form{padding:14px;display:flex;flex-direction:column;gap:11px;background:#fafbff;border-top:1px solid #e5e7f0}
 .edit-field{display:flex;flex-direction:column;gap:4px}
 .edit-input{padding:6px 10px;border:1.5px solid #d4d8f0;border-radius:6px;font-size:12px;color:#1E1B3C;font-family:inherit;transition:border-color .15s}
@@ -536,79 +575,78 @@ function DomainGrid({domains,impact,selected,onSelect,onEdit,onAdd}){
   );
 }
 
+// ── DOMAIN CARD INLINE EDIT ───────────────────────────
+function DomainCardInlineEdit({domain,onSave,onDelete,onCancel}){
+  const fromLines=s=>s.split('\n').map(l=>l.trim()).filter(Boolean);
+  const[f,setF]=useState({health:domain.health,ops:(domain.operations||[]).join('\n')});
+  const[confirmDel,setConfirmDel]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const submit=e=>{
+    e.preventDefault();
+    onSave({id:domain.id,health:f.health,operations:fromLines(f.ops)});
+  };
+  return h('div',{className:'dc dc-editing'},
+    h('form',{onSubmit:submit},
+      h('div',{className:'dce-hdr'},
+        h('span',{className:'dce-name-lbl'},domain.icon,' ',domain.name),
+        h('button',{type:'button',className:'dce-btn-cancel',title:'Cancel',onClick:onCancel},'✕')
+      ),
+      h('div',{className:'dce-field'},
+        h('span',{className:'dce-lbl'},'Health'),
+        h('select',{className:'dce-sel',value:f.health,onChange:e=>set('health',e.target.value)},
+          h('option',{value:'good'},'✅ Rich model'),
+          h('option',{value:'partial'},'🟡 Partial'),
+          h('option',{value:'anemic'},'🔴 Anemic')
+        )
+      ),
+      h('div',{className:'dce-field'},
+        h('span',{className:'dce-lbl'},'Operations ',h('span',{className:'dce-hint'},'(one per line)')),
+        h('textarea',{className:'dce-ta',rows:3,value:f.ops,onChange:e=>set('ops',e.target.value),placeholder:'CreateFile\nUpdateFile'})
+      ),
+      h('div',{className:'dce-ftr'},
+        !confirmDel
+          ?h('button',{type:'button',className:'dce-btn dce-btn-dg',onClick:()=>setConfirmDel(true)},'Remove domain')
+          :h('div',{className:'dce-confirm'},
+              h('span',null,'Remove?'),
+              h('button',{type:'button',className:'dce-btn dce-btn-danger',onClick:()=>onDelete(domain.id)},'Yes'),
+              h('button',{type:'button',className:'dce-btn dce-ghost',onClick:()=>setConfirmDel(false)},'No')
+            ),
+        h('div',{className:'dce-ftr-r'},
+          h('button',{type:'button',className:'dce-btn dce-ghost',onClick:onCancel},'Cancel'),
+          h('button',{type:'submit',className:'dce-btn dce-primary'},'Save')
+        )
+      )
+    )
+  );
+}
+
 // ── DOMAIN EDIT MODAL ────────────────────────────────
 function DomainEditModal({domain,isNew,onSave,onDelete,onClose}){
-  const TABS=['basic','ddd'];
-  const[tab,setTab]=useState('basic');
   const[confirmDel,setConfirmDel]=useState(false);
-  const toLines=arr=>(arr||[]).join('\n');
   const fromLines=s=>s.split('\n').map(l=>l.trim()).filter(Boolean);
-  const[f,setF]=useState(()=>{
-    if(!domain||isNew)return{id:'',name:'',icon:'📦',health:'partial',ops:'',aggregate:'',identity:'',valueObjects:'',lifecycle:'',childEntities:'',invariants:'',commands:[]};
-    const t=domain.dddTarget||{};
-    return{id:domain.id,name:domain.name,icon:domain.icon,health:domain.health,
-      ops:toLines(domain.operations),aggregate:t.aggregate||'',identity:t.identity||'',
-      valueObjects:toLines(t.valueObjects),lifecycle:toLines(t.lifecycle),
-      childEntities:toLines(t.childEntities),invariants:toLines(t.invariants),
-      commands:t.commands?[...t.commands]:[]};
-  });
+  const[f,setF]=useState({id:'',name:'',icon:'📦',health:'partial',ops:''});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const addCmd=()=>setF(p=>({...p,commands:[...p.commands,{cmd:'',event:''}]}));
-  const updCmd=(i,k,v)=>setF(p=>{const c=[...p.commands];c[i]={...c[i],[k]:v};return{...p,commands:c};});
-  const rmCmd=i=>setF(p=>({...p,commands:p.commands.filter((_,j)=>j!==i)}));
   const submit=e=>{
     e.preventDefault();
     if(!f.name.trim())return;
     if(isNew&&!f.id.trim())return;
-    onSave({id:f.id.trim(),name:f.name.trim(),icon:f.icon.trim()||'📦',health:f.health,
-      operations:fromLines(f.ops),
-      dddTarget:{aggregate:f.aggregate.trim()||undefined,identity:f.identity.trim()||undefined,
-        lifecycle:fromLines(f.lifecycle),valueObjects:fromLines(f.valueObjects),
-        childEntities:fromLines(f.childEntities),invariants:fromLines(f.invariants),
-        commands:f.commands.filter(c=>c.cmd.trim())}});
+    onSave({id:f.id.trim(),name:f.name.trim(),icon:f.icon.trim()||'📦',health:f.health,operations:fromLines(f.ops)});
   };
   return h('div',{className:'dem-ov',onClick:e=>{if(e.target===e.currentTarget)onClose();}},
     h('div',{className:'dem-panel'},
       h('div',{className:'dem-hdr'},
-        h('span',{className:'dem-title'},isNew?'➕ Add Domain':'✏️ Edit Domain'),
+        h('span',{className:'dem-title'},'➕ Add Domain'),
         h('button',{className:'dem-x',onClick:onClose},'✕')
-      ),
-      h('div',{className:'dem-tabs'},
-        TABS.map(t=>h('button',{key:t,type:'button',className:`dem-tab${tab===t?' active':''}`,onClick:()=>setTab(t)},t==='basic'?'Basic Info':'DDD Target'))
       ),
       h('form',{onSubmit:submit,style:{display:'flex',flexDirection:'column',flex:1,overflow:'hidden'}},
         h('div',{className:'dem-body'},
-          tab==='basic'&&h(React.Fragment,null,
-            isNew&&h('label',null,h('span',{className:'dem-lbl'},'Domain ID *'),h('input',{className:'dem-input',value:f.id,onChange:e=>set('id',e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'-')),placeholder:'e.g. billing',required:true}),h('span',{className:'dem-hint'},'Lowercase, hyphens only')),
-            h('div',{className:'dem-row'},
-              h('div',{style:{width:72}},h('span',{className:'dem-lbl'},'Icon'),h('input',{className:'dem-input',value:f.icon,onChange:e=>set('icon',e.target.value),maxLength:4})),
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Name *'),h('input',{className:'dem-input',value:f.name,onChange:e=>set('name',e.target.value),required:true}))
-            ),
-            h('div',null,h('span',{className:'dem-lbl'},'Health'),h('select',{className:'dem-sel',value:f.health,onChange:e=>set('health',e.target.value)},h('option',{value:'good'},'✅ Rich model'),h('option',{value:'partial'},'🟡 Partial'),h('option',{value:'anemic'},'🔴 Anemic'))),
-            h('div',null,h('span',{className:'dem-lbl'},'Operations ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:6,value:f.ops,onChange:e=>set('ops',e.target.value),placeholder:'CreateFile\nUpdateFile'}))
+          h('label',null,h('span',{className:'dem-lbl'},'Domain ID *'),h('input',{className:'dem-input',value:f.id,onChange:e=>set('id',e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'-')),placeholder:'e.g. billing',required:true}),h('span',{className:'dem-hint'},'Lowercase, hyphens only')),
+          h('div',{className:'dem-row'},
+            h('div',{style:{width:72}},h('span',{className:'dem-lbl'},'Icon'),h('input',{className:'dem-input',value:f.icon,onChange:e=>set('icon',e.target.value),maxLength:4})),
+            h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Name *'),h('input',{className:'dem-input',value:f.name,onChange:e=>set('name',e.target.value),required:true}))
           ),
-          tab==='ddd'&&h(React.Fragment,null,
-            h('div',{className:'dem-row'},
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Aggregate Root'),h('input',{className:'dem-input',value:f.aggregate,onChange:e=>set('aggregate',e.target.value),placeholder:'e.g. FileEntity'})),
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Identity'),h('input',{className:'dem-input',value:f.identity,onChange:e=>set('identity',e.target.value),placeholder:'e.g. Id (GUID)'}))
-            ),
-            h('div',{className:'dem-row'},
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Value Objects ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:4,value:f.valueObjects,onChange:e=>set('valueObjects',e.target.value)})),
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Child Entities ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:4,value:f.childEntities,onChange:e=>set('childEntities',e.target.value)}))
-            ),
-            h('div',null,h('span',{className:'dem-lbl'},'Lifecycle States ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:3,value:f.lifecycle,onChange:e=>set('lifecycle',e.target.value)})),
-            h('div',null,h('span',{className:'dem-lbl'},'Invariants ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:4,value:f.invariants,onChange:e=>set('invariants',e.target.value)})),
-            h('div',null,
-              h('span',{className:'dem-lbl'},'Commands'),
-              f.commands.map((c,i)=>h('div',{key:i,className:'dem-cmd-row'},
-                h('input',{className:'dem-input',value:c.cmd,onChange:e=>updCmd(i,'cmd',e.target.value),placeholder:'Checkout(actorId)'}),
-                h('span',{className:'dem-cmd-arrow'},'→'),
-                h('input',{className:'dem-input',value:c.event,onChange:e=>updCmd(i,'event',e.target.value),placeholder:'FileCheckedOut'}),
-                h('button',{type:'button',className:'dem-cmd-rm',onClick:()=>rmCmd(i)},'✕')
-              )),
-              h('button',{type:'button',className:'dem-add-cmd',onClick:addCmd},'+ Add command')
-            )
-          )
+          h('div',null,h('span',{className:'dem-lbl'},'Health'),h('select',{className:'dem-sel',value:f.health,onChange:e=>set('health',e.target.value)},h('option',{value:'good'},'✅ Rich model'),h('option',{value:'partial'},'🟡 Partial'),h('option',{value:'anemic'},'🔴 Anemic'))),
+          h('div',null,h('span',{className:'dem-lbl'},'Operations ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:6,value:f.ops,onChange:e=>set('ops',e.target.value),placeholder:'CreateFile\nUpdateFile'}))
         ),
         h('div',{className:'dem-ftr'},
           !isNew&&onDelete&&!confirmDel&&h('button',{type:'button',className:'dem-btn dem-btn-dg',onClick:()=>setConfirmDel(true)},'Remove domain'),
@@ -1727,8 +1765,9 @@ function App(){
   const[editedTargets,setEditedTargets]=useState({});
   const[ctxMapStatus,setCtxMapStatus]=useState('idle'); // 'idle' | 'generating' | 'ready'
   const[impactLoading,setImpactLoading]=useState(false);
-  const[editDomain,setEditDomain]=useState(null); // domain object or null
+  const[editDomain,setEditDomain]=useState(null); // domain object or null (modal, add only)
   const[isNewDomain,setIsNewDomain]=useState(false);
+  const[editingId,setEditingId]=useState(null); // inline card edit
   const[toasts,setToasts]=useState([]);
 
   const showToast=(msg,type='success')=>{
@@ -1898,16 +1937,31 @@ function App(){
               const reason=score?.reason||'';
               const vio=domainViolations[d.id]||( d.health==='anemic'?'P1':null);
               const cls=['dc',impact?`d-${lvl}`:'',selDomain===d.id?'selected':''].filter(Boolean).join(' ');
-              return h('div',{key:d.id,className:cls,onClick:()=>setSelDomain(d.id===selDomain?null:d.id)},
+              if(editingId===d.id) return h(DomainCardInlineEdit,{key:d.id,domain:d,
+                onSave:async patch=>{
+                  const r=await fetch(`${API}/api/services/${activeSvc}/domains/${patch.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+                  if(r.ok){setData(await r.json());showToast(`✅ "${patch.name}" saved`);}
+                  else showToast('❌ Failed to save','danger');
+                  setEditingId(null);
+                },
+                onDelete:async domainId=>{
+                  const name=data.domains.find(x=>x.id===domainId)?.name||domainId;
+                  const r=await fetch(`${API}/api/services/${activeSvc}/domains/${domainId}`,{method:'DELETE'});
+                  if(r.ok){setData(await r.json());showToast(`🗑 "${name}" removed`,'danger');}
+                  else showToast('❌ Failed to remove','danger');
+                  setEditingId(null);
+                },
+                onCancel:()=>setEditingId(null)
+              });
+              return h('div',{key:d.id,className:cls,onClick:()=>{setEditingId(null);setSelDomain(d.id===selDomain?null:d.id);}},
                 h('div',{className:'dc-hdr'},
                   h('span',{className:'dc-icon'},d.icon),
                   h('span',{className:'dc-name'},d.name),
                   impact&&lvl!=='none'&&h('span',{className:`dc-ibadge ${lvl}`},lvl==='direct'?'🔴 Direct':'🟡 Indirect'),
                   vio&&!impact&&h('span',{className:`vio-badge ${vio}`},vio),
-                  h('button',{className:'dc-edit-btn',title:'Edit domain',onClick:e=>{e.stopPropagation();setEditDomain(d);setIsNewDomain(false);}},'✏️')
+                  h('button',{className:'dc-edit-btn',onClick:e=>{e.stopPropagation();setEditingId(d.id);}},'Edit')
                 ),
                 h('div',{className:'dc-health'},HEALTH_LABEL[d.health]),
-                // Show Claude's reason when impact is active
                 impact&&lvl!=='none'&&reason&&h('div',{style:{fontSize:10,color:lvl==='direct'?'#C62828':'#7A5000',marginBottom:4,lineHeight:1.4,fontStyle:'italic'}},reason),
                 h('ul',{className:'dc-ops'},
                   d.operations.slice(0,3).map(op=>h('li',{key:op,className:(score?.matchedOps||[]).includes(op)?'op-hit':''},op)),
@@ -2031,7 +2085,7 @@ function App(){
     // Analyze panel modal
     showAnalyze&&h(AnalyzePanel,{onClose:()=>setShowAnalyze(false),onDone:handleAnalyzeDone}),
     // Domain edit/add modal
-    (editDomain||isNewDomain)&&h(DomainEditModal,{domain:editDomain,isNew:isNewDomain,onSave:handleSaveDomain,onDelete:isNewDomain?undefined:handleDeleteDomain,onClose:()=>{setEditDomain(null);setIsNewDomain(false);}}),
+    isNewDomain&&h(DomainEditModal,{domain:null,isNew:true,onSave:handleSaveDomain,onClose:()=>{setEditDomain(null);setIsNewDomain(false);}}),
     // Toasts
     toasts.length>0&&h('div',{className:'toast-wrap'},
       toasts.map(t=>h('div',{key:t.id,className:`toast toast-${t.type}`},t.msg))

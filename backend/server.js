@@ -9,6 +9,7 @@ const sqliteDb      = require('./db');
 
 const DATA_DIR     = path.join(__dirname, 'data');
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
+const FRONTEND_DIST = path.join(FRONTEND_DIR, 'dist');
 const PORT         = 3001;
 
 // ── NLP setup ────────────────────────────────────────────────────────────────
@@ -287,7 +288,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve compiled frontend (if present)
+// Serve frontend
 app.get('/', (req, res) => {
   const file = path.join(FRONTEND_DIR, 'index.html');
   fs.existsSync(file) ? res.sendFile(file) : res.status(404).send('Frontend not found');
