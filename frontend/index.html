@@ -622,77 +622,31 @@ function DomainCardInlineEdit({domain,onSave,onDelete,onCancel}){
 
 // ── DOMAIN EDIT MODAL ────────────────────────────────
 function DomainEditModal({domain,isNew,onSave,onDelete,onClose}){
-  const TABS=['basic','ddd'];
-  const[tab,setTab]=useState('basic');
   const[confirmDel,setConfirmDel]=useState(false);
-  const toLines=arr=>(arr||[]).join('\n');
   const fromLines=s=>s.split('\n').map(l=>l.trim()).filter(Boolean);
-  const[f,setF]=useState(()=>{
-    if(!domain||isNew)return{id:'',name:'',icon:'📦',health:'partial',ops:'',aggregate:'',identity:'',valueObjects:'',lifecycle:'',childEntities:'',invariants:'',commands:[]};
-    const t=domain.dddTarget||{};
-    return{id:domain.id,name:domain.name,icon:domain.icon,health:domain.health,
-      ops:toLines(domain.operations),aggregate:t.aggregate||'',identity:t.identity||'',
-      valueObjects:toLines(t.valueObjects),lifecycle:toLines(t.lifecycle),
-      childEntities:toLines(t.childEntities),invariants:toLines(t.invariants),
-      commands:t.commands?[...t.commands]:[]};
-  });
+  const[f,setF]=useState({id:'',name:'',icon:'📦',health:'partial',ops:''});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const addCmd=()=>setF(p=>({...p,commands:[...p.commands,{cmd:'',event:''}]}));
-  const updCmd=(i,k,v)=>setF(p=>{const c=[...p.commands];c[i]={...c[i],[k]:v};return{...p,commands:c};});
-  const rmCmd=i=>setF(p=>({...p,commands:p.commands.filter((_,j)=>j!==i)}));
   const submit=e=>{
     e.preventDefault();
     if(!f.name.trim())return;
     if(isNew&&!f.id.trim())return;
-    onSave({id:f.id.trim(),name:f.name.trim(),icon:f.icon.trim()||'📦',health:f.health,
-      operations:fromLines(f.ops),
-      dddTarget:{aggregate:f.aggregate.trim()||undefined,identity:f.identity.trim()||undefined,
-        lifecycle:fromLines(f.lifecycle),valueObjects:fromLines(f.valueObjects),
-        childEntities:fromLines(f.childEntities),invariants:fromLines(f.invariants),
-        commands:f.commands.filter(c=>c.cmd.trim())}});
+    onSave({id:f.id.trim(),name:f.name.trim(),icon:f.icon.trim()||'📦',health:f.health,operations:fromLines(f.ops)});
   };
   return h('div',{className:'dem-ov',onClick:e=>{if(e.target===e.currentTarget)onClose();}},
     h('div',{className:'dem-panel'},
       h('div',{className:'dem-hdr'},
-        h('span',{className:'dem-title'},isNew?'➕ Add Domain':'✏️ Edit Domain'),
+        h('span',{className:'dem-title'},'➕ Add Domain'),
         h('button',{className:'dem-x',onClick:onClose},'✕')
-      ),
-      h('div',{className:'dem-tabs'},
-        TABS.map(t=>h('button',{key:t,type:'button',className:`dem-tab${tab===t?' active':''}`,onClick:()=>setTab(t)},t==='basic'?'Basic Info':'DDD Target'))
       ),
       h('form',{onSubmit:submit,style:{display:'flex',flexDirection:'column',flex:1,overflow:'hidden'}},
         h('div',{className:'dem-body'},
-          tab==='basic'&&h(React.Fragment,null,
-            isNew&&h('label',null,h('span',{className:'dem-lbl'},'Domain ID *'),h('input',{className:'dem-input',value:f.id,onChange:e=>set('id',e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'-')),placeholder:'e.g. billing',required:true}),h('span',{className:'dem-hint'},'Lowercase, hyphens only')),
-            h('div',{className:'dem-row'},
-              h('div',{style:{width:72}},h('span',{className:'dem-lbl'},'Icon'),h('input',{className:'dem-input',value:f.icon,onChange:e=>set('icon',e.target.value),maxLength:4})),
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Name *'),h('input',{className:'dem-input',value:f.name,onChange:e=>set('name',e.target.value),required:true}))
-            ),
-            h('div',null,h('span',{className:'dem-lbl'},'Health'),h('select',{className:'dem-sel',value:f.health,onChange:e=>set('health',e.target.value)},h('option',{value:'good'},'✅ Rich model'),h('option',{value:'partial'},'🟡 Partial'),h('option',{value:'anemic'},'🔴 Anemic'))),
-            h('div',null,h('span',{className:'dem-lbl'},'Operations ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:6,value:f.ops,onChange:e=>set('ops',e.target.value),placeholder:'CreateFile\nUpdateFile'}))
+          h('label',null,h('span',{className:'dem-lbl'},'Domain ID *'),h('input',{className:'dem-input',value:f.id,onChange:e=>set('id',e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'-')),placeholder:'e.g. billing',required:true}),h('span',{className:'dem-hint'},'Lowercase, hyphens only')),
+          h('div',{className:'dem-row'},
+            h('div',{style:{width:72}},h('span',{className:'dem-lbl'},'Icon'),h('input',{className:'dem-input',value:f.icon,onChange:e=>set('icon',e.target.value),maxLength:4})),
+            h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Name *'),h('input',{className:'dem-input',value:f.name,onChange:e=>set('name',e.target.value),required:true}))
           ),
-          tab==='ddd'&&h(React.Fragment,null,
-            h('div',{className:'dem-row'},
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Aggregate Root'),h('input',{className:'dem-input',value:f.aggregate,onChange:e=>set('aggregate',e.target.value),placeholder:'e.g. FileEntity'})),
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Identity'),h('input',{className:'dem-input',value:f.identity,onChange:e=>set('identity',e.target.value),placeholder:'e.g. Id (GUID)'}))
-            ),
-            h('div',{className:'dem-row'},
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Value Objects ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:4,value:f.valueObjects,onChange:e=>set('valueObjects',e.target.value)})),
-              h('div',{style:{flex:1}},h('span',{className:'dem-lbl'},'Child Entities ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:4,value:f.childEntities,onChange:e=>set('childEntities',e.target.value)}))
-            ),
-            h('div',null,h('span',{className:'dem-lbl'},'Lifecycle States ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:3,value:f.lifecycle,onChange:e=>set('lifecycle',e.target.value)})),
-            h('div',null,h('span',{className:'dem-lbl'},'Invariants ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:4,value:f.invariants,onChange:e=>set('invariants',e.target.value)})),
-            h('div',null,
-              h('span',{className:'dem-lbl'},'Commands'),
-              f.commands.map((c,i)=>h('div',{key:i,className:'dem-cmd-row'},
-                h('input',{className:'dem-input',value:c.cmd,onChange:e=>updCmd(i,'cmd',e.target.value),placeholder:'Checkout(actorId)'}),
-                h('span',{className:'dem-cmd-arrow'},'→'),
-                h('input',{className:'dem-input',value:c.event,onChange:e=>updCmd(i,'event',e.target.value),placeholder:'FileCheckedOut'}),
-                h('button',{type:'button',className:'dem-cmd-rm',onClick:()=>rmCmd(i)},'✕')
-              )),
-              h('button',{type:'button',className:'dem-add-cmd',onClick:addCmd},'+ Add command')
-            )
-          )
+          h('div',null,h('span',{className:'dem-lbl'},'Health'),h('select',{className:'dem-sel',value:f.health,onChange:e=>set('health',e.target.value)},h('option',{value:'good'},'✅ Rich model'),h('option',{value:'partial'},'🟡 Partial'),h('option',{value:'anemic'},'🔴 Anemic'))),
+          h('div',null,h('span',{className:'dem-lbl'},'Operations ',h('span',{className:'dem-hint'},'(one per line)')),h('textarea',{className:'dem-ta',rows:6,value:f.ops,onChange:e=>set('ops',e.target.value),placeholder:'CreateFile\nUpdateFile'}))
         ),
         h('div',{className:'dem-ftr'},
           !isNew&&onDelete&&!confirmDel&&h('button',{type:'button',className:'dem-btn dem-btn-dg',onClick:()=>setConfirmDel(true)},'Remove domain'),
