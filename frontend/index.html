@@ -348,6 +348,53 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 @keyframes spin{to{transform:rotate(360deg)}}
 .empty{color:#9AA7B4;font-size:13px;padding:20px 0;text-align:center}
 @media(max-width:900px){.int-grid{grid-template-columns:repeat(2,1fr)}.sidebar{display:none}}
+
+/* ── DDD TARGET TOOLBAR & CONTEXT MAP ── */
+.ddd-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.ctx-map-btn{padding:7px 14px;border:1.5px solid #7c3aed;border-radius:8px;background:#fff;font-size:12px;font-weight:700;color:#7c3aed;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .18s}
+.ctx-map-btn:hover,.ctx-map-btn.active{background:#7c3aed;color:#fff}
+.ctx-map-section{margin-top:24px;border-top:2px solid #ede9f6;padding-top:20px}
+.ctx-map-hdr{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+
+/* ── INLINE EDITING ── */
+.agg-edit-btn{margin-left:auto;padding:2px 8px;border:1px solid rgba(255,255,255,.35);border-radius:4px;background:rgba(255,255,255,.12);color:#fff;font-size:10px;cursor:pointer;font-weight:700;transition:background .15s}
+.agg-edit-btn:hover{background:rgba(255,255,255,.28)}
+.agg-edit-form{padding:14px;display:flex;flex-direction:column;gap:11px;background:#fafbff;border-top:1px solid #e5e7f0}
+.edit-field{display:flex;flex-direction:column;gap:4px}
+.edit-input{padding:6px 10px;border:1.5px solid #d4d8f0;border-radius:6px;font-size:12px;color:#1E1B3C;font-family:inherit;transition:border-color .15s}
+.edit-input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+.edit-textarea{padding:8px 10px;border:1.5px solid #d4d8f0;border-radius:6px;font-size:12px;color:#1E1B3C;resize:vertical;font-family:inherit;min-height:72px}
+.edit-textarea:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+.chip-editor{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:28px}
+.chip-editable{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px 3px 10px;border-radius:12px;background:#ede9f6;border:1px solid #c4b5e0;color:#5B1D8B}
+.chip-editable button{border:none;background:none;color:#9333ea;cursor:pointer;padding:0 2px;font-size:13px;line-height:1}
+.chip-add-row{display:flex;gap:4px;align-items:center}
+.chip-input{padding:3px 9px;border:1px solid #d4d8f0;border-radius:12px;font-size:11px;width:96px;font-family:inherit}
+.chip-input:focus{outline:none;border-color:#7c3aed}
+.chip-add-btn{padding:3px 8px;border:1px solid #d4d8f0;border-radius:12px;background:#fff;font-size:12px;cursor:pointer;color:#7c3aed;font-weight:700;transition:all .15s}
+.chip-add-btn:hover{background:#ede9f6;border-color:#7c3aed}
+.cmd-editor{display:flex;flex-direction:column;gap:5px}
+.cmd-edit-row{display:flex;align-items:center;gap:6px}
+.cmd-input{flex:1;padding:5px 8px;border:1.5px solid #d4d8f0;border-radius:6px;font-size:11px;font-family:monospace}
+.cmd-input:focus{outline:none;border-color:#7c3aed}
+.cmd-arrow{color:#c0c8d4;font-weight:700;font-size:13px;flex-shrink:0}
+.cmd-del{border:none;background:none;color:#c0c8d4;cursor:pointer;font-size:16px;line-height:1;padding:0 2px}
+.cmd-del:hover{color:#ef5350}
+.cmd-add-btn{padding:5px 12px;border:1px dashed #d4d8f0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;color:#7c3aed;text-align:center;transition:all .15s}
+.cmd-add-btn:hover{background:#ede9f6;border-color:#7c3aed}
+.edit-btn-row{display:flex;gap:8px;padding-top:4px}
+.save-btn{padding:7px 18px;border:none;border-radius:8px;background:#5B1D8B;color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s}
+.save-btn:hover{background:#4a1572}
+.cancel-btn{padding:7px 14px;border:1.5px solid #d4d8f0;border-radius:8px;background:#fff;color:#5B6F8A;font-size:12px;font-weight:600;cursor:pointer}
+.cancel-btn:hover{background:#f4f7fc}
+.agg-edited{position:relative}.agg-edited::after{content:'edited';position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#fff8e1;border:1px solid #ffc107;color:#7a5000}
+.mining-summary{display:flex;align-items:center;gap:20px;padding:10px 16px;background:#f8f9fc;border:1px solid #e5e8f0;border-radius:10px;margin-bottom:18px;flex-wrap:wrap}
+.ms-stat{font-size:12px;color:#5B6F8A;white-space:nowrap}.ms-stat strong{color:#1a1e2e;margin-right:3px}
+.ms-divider{color:#d4d8f0;font-size:14px;user-select:none}
+.ctx-section{margin-bottom:28px}
+.ctx-section-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:6px 12px;border-radius:8px;border-left:4px solid currentColor}
+.ctx-section-hdr .ctx-name{font-size:13px;font-weight:700}
+.ctx-section-hdr .ctx-count{font-size:11px;opacity:.7}
 </style>
 </head>
 <body>
@@ -848,25 +895,68 @@ function AggregateDiagram({data,highlightId}){
   const LEFT=80, TOP=52;
   const W=LEFT+INNER_W+LEFT+120; // +120 for Kafka labels on right
 
-  // ── RELATIONSHIPS: explicit workflow sequences only ───────────────────────
-  const relMap={};
-  (data.workflows||[]).forEach(wf=>{
-    const doms=(wf.domains||[]).filter(id=>pos[id]);
-    const hasVio=wf.steps?.some(s=>s.type==='violation');
-    for(let i=0;i<doms.length-1;i++){
-      const key=doms[i]+'→'+doms[i+1];
-      if(relMap[key])continue;
-      const steps=wf.steps||[];
-      const evtStep=steps.find(s=>s.type==='kafka');
-      const rawLabel=evtStep?evtStep.label
-        .replace(/^[←→]\s*(Kafka\s*)?(OUT|IN|out|in):\s*/i,'')
-        .replace(/^eventbus\.[^.]+\.[^.]+\./,'')
-        .replace(/^SearchProducer\s*→\s*/,'')
-        .slice(0,22):'';
-      relMap[key]={from:doms[i],to:doms[i+1],label:rawLabel,vio:hasVio,wfName:wf.name};
+  // ── RELATIONSHIPS: from domain map relationships[] only (never from workflows) ─
+  // Relationship types and their visual style:
+  //   child-of   → purple solid ◆──►  (composition: child cannot exist without parent)
+  //   references → blue solid ──►     (association: optional FK)
+  //   guarded-by → amber dashed - -►  (permission check before mutation)
+  //   notifies   → green solid ──►    (domain event published to another aggregate)
+  //   coordinates→ teal solid ◄──►    (domain service coordinates both)
+  //   depends-on → grey dotted ···►   (reads from another aggregate's read model)
+  const REL_STYLE={
+    'child-of':   {color:'#7c3aed',dash:'none',  marker:'m-child',  width:2},
+    'references': {color:'#2563eb',dash:'none',  marker:'m-ref',    width:1.5},
+    'guarded-by': {color:'#d97706',dash:'5,3',   marker:'m-guard',  width:1.5},
+    'notifies':   {color:'#059669',dash:'none',  marker:'m-notify', width:1.8},
+    'coordinates':{color:'#0891b2',dash:'none',  marker:'m-coord',  width:1.5},
+    'depends-on': {color:'#9ca3af',dash:'2,3',   marker:'m-dep',    width:1.5},
+  };
+  const DEFAULT_STYLE={color:'#94a3b8',dash:'none',marker:'m-ref',width:1.5};
+
+  // Use data.relationships if present; fall back to deriving from workflows for
+  // legacy JSON files that predate the domain-analysis skill output.
+  let rels=[];
+  if((data.relationships||[]).length>0){
+    rels=(data.relationships||[])
+      .filter(r=>pos[r.from]!=null&&pos[r.to]!=null)
+      .map(r=>({
+        from:r.from, to:r.to,
+        type:r.type||'references',
+        label:(r.field||r.description||'').replace(/\s*[—–(].*/,'').trim().slice(0,20),
+        description:r.description||''
+      }));
+  } else {
+    // Legacy fallback: derive from workflows with fuzzy domain ID resolution.
+    // Workflow domain IDs may differ from actual domain IDs (e.g. "file-versioning"
+    // vs "file") due to analysis pipeline inconsistency. Resolve by:
+    // 1. Exact match, 2. Prefix match, 3. Keyword overlap in name.
+    const actualIds=aggs.map(d=>({id:d.id,name:(d.name||'').toLowerCase()}));
+    function resolveId(wfId){
+      if(pos[wfId]!=null)return wfId; // exact match
+      const wfWords=wfId.toLowerCase().split(/[-_]/);
+      // prefix: actual id starts with the first word of workflow id
+      let best=actualIds.find(a=>a.id.startsWith(wfWords[0]));
+      if(best&&pos[best.id]!=null)return best.id;
+      // keyword: actual name contains any word from workflow id
+      best=actualIds.find(a=>wfWords.some(w=>w.length>3&&(a.id.includes(w)||a.name.includes(w))));
+      if(best&&pos[best.id]!=null)return best.id;
+      return null;
     }
-  });
-  const rels=Object.values(relMap);
+    const relMap={};
+    (data.workflows||[]).forEach(wf=>{
+      const doms=(wf.domains||[]).map(resolveId).filter(Boolean);
+      // deduplicate consecutive identical IDs after resolution
+      const deduped=doms.filter((id,i)=>i===0||id!==doms[i-1]);
+      for(let i=0;i<deduped.length-1;i++){
+        const key=deduped[i]+'→'+deduped[i+1];
+        if(relMap[key])continue;
+        const evtStep=(wf.steps||[]).find(s=>s.type==='kafka');
+        const rawLabel=evtStep?evtStep.label.replace(/^[←→]\s*(Kafka\s*)?(OUT|IN):\s*/i,'').replace(/^eventbus\.[^.]+\.[^.]+\./,'').slice(0,20):'';
+        relMap[key]={from:deduped[i],to:deduped[i+1],type:'references',label:rawLabel,description:wf.name};
+      }
+    });
+    rels=Object.values(relMap);
+  }
 
   const kafkaIn=bc.consumes||[], kafkaOut=bc.publishes||[], http=bc.dependsOn||[];
   const svgH=TOP+INNER_H+180; // bottom space for HTTP deps + legend
@@ -907,6 +997,7 @@ function AggregateDiagram({data,highlightId}){
     const cx=x+BOX_W/2;
     const color=AGG_COLORS[i%AGG_COLORS.length];
     const t=d.dddTarget;
+    if(!t||!t.aggregate)return null;
     const lc=(t.lifecycle||[]).slice(0,5);
     const vos=(t.valueObjects||[]).slice(0,4);
     const cmds=(t.commands||[]).slice(0,3);
@@ -978,9 +1069,9 @@ function AggregateDiagram({data,highlightId}){
       h('line',{x1:x+6,y1:y+ySep4,x2:x+BOX_W-6,y2:y+ySep4,stroke:'#e2e8f0',strokeWidth:1}),
       // Commands
       h('g',{transform:`translate(${x+8},${y+yCmdStart})`},
-        cmds.map((c,j)=>h('g',{key:c.cmd},
-          h('text',{x:0,y:j*13+9,fontSize:7.5,fill:'#1d4ed8',fontFamily:'monospace'},c.cmd.split('(')[0]+'()'),
-          h('text',{x:BOX_W-18,y:j*13+9,textAnchor:'end',fontSize:7,fill:'#16a34a'},'→'+c.event.slice(0,14))
+        cmds.map((c,j)=>h('g',{key:(c.cmd||j)},
+          h('text',{x:0,y:j*13+9,fontSize:7.5,fill:'#1d4ed8',fontFamily:'monospace'},(c.cmd||'').split('(')[0]+'()'),
+          h('text',{x:BOX_W-18,y:j*13+9,textAnchor:'end',fontSize:7,fill:'#16a34a'},'→'+(c.event||'').slice(0,14))
         )),
         (t.commands||[]).length>3&&h('text',{x:0,y:3*13+9,fontSize:7,fill:'#94a3b8'},
           '+'+(t.commands.length-3)+' more…')
@@ -1000,16 +1091,33 @@ function AggregateDiagram({data,highlightId}){
       h('span',{style:{fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'.07em'}},
         'Aggregate Context Diagram'),
       h('span',{style:{fontSize:10,color:'#94a3b8'}},
-        '— relationships from explicit workflow sequences · DDD UML notation')
+        data.relationships?.length>0
+          ?'— relationships from domain model (FK fields, events, permissions)'
+          :'— relationships derived from workflows (run domain-analysis for accurate model)'
+      )
     ),
     h('svg',{viewBox:`0 0 ${W} ${svgH}`,xmlns:'http://www.w3.org/2000/svg',
       style:{width:'100%',minWidth:620,display:'block',fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif'}},
 
       h('defs',null,
-        h('marker',{id:'m-ev',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
-          h('polygon',{points:'0 0,8 3,0 6',fill:'#f59e0b'})),
-        h('marker',{id:'m-vi',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
-          h('polygon',{points:'0 0,8 3,0 6',fill:'#ef4444'}))
+        // Open arrowhead (references, depends-on)
+        h('marker',{id:'m-ref',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'none',stroke:'#2563eb',strokeWidth:1})),
+        // Filled arrow (child-of — purple)
+        h('marker',{id:'m-child',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#7c3aed'})),
+        // Filled arrow (guarded-by — amber)
+        h('marker',{id:'m-guard',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#d97706'})),
+        // Filled arrow (notifies — green)
+        h('marker',{id:'m-notify',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#059669'})),
+        // Filled arrow (coordinates — teal)
+        h('marker',{id:'m-coord',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#0891b2'})),
+        // Grey dot (depends-on)
+        h('marker',{id:'m-dep',markerWidth:8,markerHeight:6,refX:8,refY:3,orient:'auto'},
+          h('polygon',{points:'0 0,8 3,0 6',fill:'#9ca3af'}))
       ),
 
       // Bounded context dashed background
@@ -1022,19 +1130,18 @@ function AggregateDiagram({data,highlightId}){
       ...rels.map(rel=>{
         const route=routeArrow(rel.from,rel.to);
         if(!route)return null;
-        const color=rel.vio?'#ef4444':'#f59e0b';
-        const marker=rel.vio?'m-vi':'m-ev';
-        const dash=rel.vio?'6,3':'none';
-        return h('g',{key:rel.from+'→'+rel.to},
-          h('path',{d:route.path,fill:'none',stroke:color,strokeWidth:1.8,
-            strokeDasharray:dash,markerEnd:`url(#${marker})`}),
-          rel.label&&h('g',null,
-            h('rect',{x:route.lx-rel.label.length*2.8-2,y:route.ly-18,
-              width:rel.label.length*5.4+4,height:12,rx:3,fill:'#ffffffef',stroke:color+'44'}),
+        const style=REL_STYLE[rel.type]||DEFAULT_STYLE;
+        const label=rel.label||'';
+        return h('g',{key:rel.from+'→'+rel.to+'→'+rel.type},
+          h('path',{d:route.path,fill:'none',stroke:style.color,strokeWidth:style.width,
+            strokeDasharray:style.dash,markerEnd:`url(#${style.marker})`}),
+          label&&h('g',null,
+            h('rect',{x:route.lx-label.length*2.8-2,y:route.ly-18,
+              width:label.length*5.4+4,height:12,rx:3,fill:'#ffffffef',stroke:style.color+'55'}),
             h('text',{x:route.lx,y:route.ly-8,textAnchor:'middle',
-              fontSize:8,fill:color,fontWeight:600},rel.label)
+              fontSize:7.5,fill:style.color,fontWeight:600},label)
           ),
-          h('title',null,rel.wfName)
+          h('title',null,`${rel.type}: ${rel.description||rel.label||''}`)
         );
       }),
 
@@ -1082,10 +1189,16 @@ function AggregateDiagram({data,highlightId}){
 
       // ── LEGEND ─────────────────────────────────────────────────────────────
       h('g',{transform:`translate(${LEFT-12},${svgH-16})`},
-        h('line',{x1:0,y1:5,x2:16,y2:5,stroke:'#f59e0b',strokeWidth:1.8,markerEnd:'url(#m-ev)'}),
-        h('text',{x:20,y:9,fontSize:8,fill:'#64748b'},'Domain event flow (workflow sequence)'),
-        h('line',{x1:230,y1:5,x2:246,y2:5,stroke:'#ef4444',strokeWidth:1.8,strokeDasharray:'5,2',markerEnd:'url(#m-vi)'}),
-        h('text',{x:250,y:9,fontSize:8,fill:'#64748b'},'Workflow with DDD violation')
+        h('line',{x1:0,y1:5,x2:16,y2:5,stroke:'#7c3aed',strokeWidth:2,markerEnd:'url(#m-child)'}),
+        h('text',{x:20,y:9,fontSize:8,fill:'#64748b'},'child-of (composition)'),
+        h('line',{x1:130,y1:5,x2:146,y2:5,stroke:'#2563eb',strokeWidth:1.5,markerEnd:'url(#m-ref)'}),
+        h('text',{x:150,y:9,fontSize:8,fill:'#64748b'},'references'),
+        h('line',{x1:220,y1:5,x2:236,y2:5,stroke:'#d97706',strokeWidth:1.5,strokeDasharray:'5,3',markerEnd:'url(#m-guard)'}),
+        h('text',{x:240,y:9,fontSize:8,fill:'#64748b'},'guarded-by'),
+        h('line',{x1:320,y1:5,x2:336,y2:5,stroke:'#059669',strokeWidth:1.8,markerEnd:'url(#m-notify)'}),
+        h('text',{x:340,y:9,fontSize:8,fill:'#64748b'},'notifies (event)'),
+        h('line',{x1:430,y1:5,x2:446,y2:5,stroke:'#9ca3af',strokeWidth:1.5,strokeDasharray:'2,3',markerEnd:'url(#m-dep)'}),
+        h('text',{x:450,y:9,fontSize:8,fill:'#64748b'},'depends-on')
       )
     )
   );
@@ -1108,28 +1221,107 @@ function BoundedContextPanel({bc}){
   );
 }
 
-// ── AGGREGATE CARDS ────────────────────────────────────
+// ── CHIP EDITOR ────────────────────────────────────────
+function ChipEditor({chips,onChange}){
+  const[newVal,setNewVal]=useState('');
+  return h('div',{className:'chip-editor'},
+    (chips||[]).map((chip,i)=>h('span',{key:i,className:'chip-editable'},
+      chip,
+      h('button',{onClick:()=>onChange((chips||[]).filter((_,j)=>j!==i))},'×')
+    )),
+    h('div',{className:'chip-add-row'},
+      h('input',{className:'chip-input',value:newVal,placeholder:'Add…',
+        onChange:e=>setNewVal(e.target.value),
+        onKeyDown:e=>{if(e.key==='Enter'&&newVal.trim()){onChange([...(chips||[]),newVal.trim()]);setNewVal('');}}
+      }),
+      h('button',{className:'chip-add-btn',onClick:()=>{if(newVal.trim()){onChange([...(chips||[]),newVal.trim()]);setNewVal('');}}},'+')
+    )
+  );
+}
+
+// ── COMMAND EDITOR ──────────────────────────────────────
+function CommandEditor({cmds,onChange}){
+  return h('div',{className:'cmd-editor'},
+    (cmds||[]).map((c,i)=>h('div',{key:i,className:'cmd-edit-row'},
+      h('input',{className:'cmd-input',value:c.cmd||'',placeholder:'CommandName()',
+        onChange:e=>onChange((cmds||[]).map((x,j)=>j===i?{...x,cmd:e.target.value}:x))}),
+      h('span',{className:'cmd-arrow'},'→'),
+      h('input',{className:'cmd-input',value:c.event||'',placeholder:'EventName',
+        onChange:e=>onChange((cmds||[]).map((x,j)=>j===i?{...x,event:e.target.value}:x))}),
+      h('button',{className:'cmd-del',onClick:()=>onChange((cmds||[]).filter((_,j)=>j!==i))},'×')
+    )),
+    h('button',{className:'cmd-add-btn',onClick:()=>onChange([...(cmds||[]),{cmd:'',event:''}])},'+ Add command')
+  );
+}
+
+// ── EDITABLE AGGREGATE CARDS ────────────────────────────
 const AGG_THEMES=['t-blue','t-purple','t-green','t-amber','t-pink','t-teal'];
-function AggregateCards({domains,impact}){
+function EditableAggregateCards({domains,impact,editedTargets,onEdit}){
+  const[editingId,setEditingId]=useState(null);
+  const[draft,setDraft]=useState(null);
   const withDdd=domains.filter(d=>d.dddTarget&&d.dddTarget.aggregate&&!d.dddTarget.aggregate.includes('not found')&&!d.dddTarget.aggregate.includes('Delegated')&&!d.dddTarget.aggregate.includes('Coordinated'));
   if(!withDdd.length)return h('div',{className:'empty'},'No aggregate models defined.');
   return h('div',{className:'agg-grid'},
     withDdd.map((d,i)=>{
-      const t=d.dddTarget;
+      const t=editedTargets[d.id]||d.dddTarget;
       const theme=AGG_THEMES[i%AGG_THEMES.length];
       const lvl=impact?.domainScores[d.id]?.level??'none';
-      return h('div',{key:t.aggregate,id:'agg-'+t.aggregate,className:`agg ${theme}`},
+      const isEdited=!!editedTargets[d.id];
+      const isEditing=editingId===d.id;
+
+      if(isEditing){
+        return h('div',{key:d.id,className:`agg ${theme}${isEdited?' agg-edited':''}`},
+          h('div',{className:'agg-hdr'},
+            h('span',null,d.icon),
+            h('span',null,draft.aggregate),
+            h('span',{className:'agg-identity'},'editing…'),
+            h('button',{className:'agg-edit-btn',onClick:()=>{setEditingId(null);setDraft(null);}},'✕')
+          ),
+          h('div',{className:'agg-edit-form'},
+            h('div',{className:'edit-field'},
+              h('div',{className:'agg-lbl'},'Aggregate name'),
+              h('input',{className:'edit-input',value:draft.aggregate||'',onChange:e=>setDraft({...draft,aggregate:e.target.value})})
+            ),
+            h('div',{className:'edit-field'},
+              h('div',{className:'agg-lbl'},'Identity field'),
+              h('input',{className:'edit-input',value:draft.identity||'',onChange:e=>setDraft({...draft,identity:e.target.value})})
+            ),
+            h('div',{className:'edit-field'},
+              h('div',{className:'agg-lbl'},'Lifecycle states'),
+              h(ChipEditor,{chips:draft.lifecycle||[],onChange:chips=>setDraft({...draft,lifecycle:chips})})
+            ),
+            h('div',{className:'edit-field'},
+              h('div',{className:'agg-lbl'},'Value objects'),
+              h(ChipEditor,{chips:draft.valueObjects||[],onChange:chips=>setDraft({...draft,valueObjects:chips})})
+            ),
+            h('div',{className:'edit-field'},
+              h('div',{className:'agg-lbl'},'Invariants (one per line)'),
+              h('textarea',{className:'edit-textarea',value:(draft.invariants||[]).join('\n'),
+                onChange:e=>setDraft({...draft,invariants:e.target.value.split('\n').filter(s=>s.trim())})})
+            ),
+            h('div',{className:'edit-field'},
+              h('div',{className:'agg-lbl'},'Commands → Events'),
+              h(CommandEditor,{cmds:draft.commands||[],onChange:cmds=>setDraft({...draft,commands:cmds})})
+            ),
+            h('div',{className:'edit-btn-row'},
+              h('button',{className:'save-btn',onClick:()=>{onEdit(d.id,{...draft});setEditingId(null);setDraft(null);}},'✓ Save'),
+              h('button',{className:'cancel-btn',onClick:()=>{setEditingId(null);setDraft(null);}},'Cancel')
+            )
+          )
+        );
+      }
+
+      return h('div',{key:d.id,id:'agg-'+t.aggregate,className:`agg ${theme}${isEdited?' agg-edited':''}`},
         h('div',{className:'agg-hdr'},
           h('span',null,d.icon),
           h('span',null,t.aggregate),
-          t.identity&&h('span',{className:'agg-identity'},`id: ${t.identity}`)
+          t.identity&&h('span',{className:'agg-identity'},`id: ${t.identity}`),
+          h('button',{className:'agg-edit-btn',onClick:()=>{setEditingId(d.id);setDraft(JSON.parse(JSON.stringify(t)));}},'✏ Edit')
         ),
         h('div',{className:'agg-body'},
-          // Impact badge
           impact&&lvl!=='none'&&h('div',{style:{fontSize:11,fontWeight:700,color:lvl==='direct'?'#C62828':'#7A5000'}},
             lvl==='direct'?'🔴 Directly impacted by requirement':'🟡 Indirectly affected'
           ),
-          // Lifecycle
           t.lifecycle&&t.lifecycle.length>0&&h('div',null,
             h('div',{className:'agg-lbl'},'Lifecycle'),
             h('div',{className:'agg-lifecycle'},
@@ -1139,17 +1331,14 @@ function AggregateCards({domains,impact}){
               ]).flat().filter(Boolean)
             )
           ),
-          // Value objects
           t.valueObjects&&t.valueObjects.length>0&&h('div',null,
             h('div',{className:'agg-lbl'},'Value Objects'),
             h('div',{className:'agg-vos'},t.valueObjects.map(v=>h('span',{key:v,className:'agg-vo'},v)))
           ),
-          // Invariants
           t.invariants&&t.invariants.length>0&&h('div',null,
             h('div',{className:'agg-lbl'},'Invariants'),
             h('ul',{className:'agg-invs'},t.invariants.map((inv,j)=>h('li',{key:j},inv)))
           ),
-          // Commands
           t.commands&&t.commands.length>0&&h('div',null,
             h('div',{className:'agg-lbl'},'Commands → Events'),
             h('table',{className:'agg-cmds'},
@@ -1161,6 +1350,148 @@ function AggregateCards({domains,impact}){
         )
       );
     })
+  );
+}
+
+// ── SHARED CONTEXT GROUPS ──────────────────────────────
+const CTX_GROUPS=[
+  {name:'Content Authoring',color:'#dbeafe',border:'#2563eb',bg:'#eff6ff',keys:['file','version','folder','content','approval','expir','custom','workflo','library','preview','tag','linked','micro','import']},
+  {name:'Publishing',color:'#dcfce7',border:'#16a34a',bg:'#f0fdf4',keys:['publish','channel','shortcut','share','distribut']},
+  {name:'Workspace & Identity',color:'#f3e8ff',border:'#7c3aed',bg:'#faf5ff',keys:['team','workspace','permission','user','auth','site','profile']},
+  {name:'Analytics',color:'#fef9c3',border:'#ca8a04',bg:'#fefce8',keys:['analytic','report','activity','statistic','metric']},
+  {name:'External Systems',color:'#fee2e2',border:'#dc2626',bg:'#fef2f2',keys:['google','blob','storage','virus','bss','cache','vfs','node','external','azure','cdn']},
+];
+
+// Assigns each domain to a context group by keyword-matching domain id
+function groupByContext(domains,editedTargets){
+  const buckets=CTX_GROUPS.map(g=>({...g,domains:[]}));
+  const overflow={...CTX_GROUPS[0],domains:[]};// fallback → Content Authoring
+  domains.forEach(d=>{
+    const id=d.id.toLowerCase();
+    const t=editedTargets?editedTargets[d.id]||d.dddTarget:d.dddTarget;
+    if(!t?.aggregate||t.aggregate.includes('not found')||t.aggregate.includes('Delegated'))return;
+    const b=buckets.find(b=>b.keys.some(k=>id.includes(k)))||buckets[0];
+    b.domains.push(d);
+  });
+  return buckets.filter(b=>b.domains.length>0);
+}
+
+// ── CONTEXT MAP SVG ────────────────────────────────────
+function ContextMapSvg({data,editedTargets}){
+  const GROUPS=CTX_GROUPS;
+  // ── Layout: 5 zones with clear separation ──────────────
+  // Canvas: 820 × 650  Legend strip at bottom (y=620)
+  //
+  //   [Workspace & Identity — top centre]
+  //         ↓
+  //   [Content Authoring   ]    [Publishing    ]
+  //   [  left, tall        ]    [right top      ]
+  //                             [Analytics      ]
+  //                             [right bottom   ]
+  //         ↓
+  //        [External Systems — bottom centre]
+  //
+  const BOX={
+    'Content Authoring':    {x:20,  y:126, w:258, h:300},
+    'Publishing':           {x:552, y:106, w:218, h:185},
+    'Workspace & Identity': {x:296, y:10,  w:210, h:100},
+    'Analytics':            {x:552, y:308, w:218, h:168},
+    'External Systems':     {x:212, y:488, w:238, h:112},
+  };
+  // ARROWS: pick clean entry/exit points to avoid box overlap
+  // Using explicit path coordinates instead of midpoint to keep labels away from boxes
+  const W=820,H=650;
+  const MCLR={'am-p':'#7c3aed','am-g':'#059669','am-b':'#2563eb'};
+  const edge=(b,dx,dy)=>{
+    const cx=b.x+b.w/2,cy=b.y+b.h/2;
+    if(!dx&&!dy)return{x:cx,y:cy};
+    const tx=(b.w/2)/Math.abs(dx)||1e9,ty=(b.h/2)/Math.abs(dy)||1e9;
+    const t=Math.min(tx,ty);
+    return{x:cx+dx*t,y:cy+dy*t};
+  };
+  const aline=(fn,tn,lxOff,lyOff)=>{
+    const fb=BOX[fn],tb=BOX[tn];if(!fb||!tb)return null;
+    const fcx=fb.x+fb.w/2,fcy=fb.y+fb.h/2,tcx=tb.x+tb.w/2,tcy=tb.y+tb.h/2;
+    const dx=tcx-fcx,dy=tcy-fcy,len=Math.sqrt(dx*dx+dy*dy)||1;
+    const s=edge(fb,dx/len,dy/len),e=edge(tb,-dx/len,-dy/len);
+    // label position: midpoint shifted by optional offset to avoid box overlap
+    const lx=(s.x+e.x)/2+(lxOff||0),ly=(s.y+e.y)/2+(lyOff||0);
+    return{x1:s.x,y1:s.y,x2:e.x,y2:e.y,lx,ly};
+  };
+  // Assign aggregates to groups
+  const gmap={};GROUPS.forEach(g=>gmap[g.name]=[]);
+  data.domains.filter(d=>{const t=editedTargets[d.id]||d.dddTarget;return t?.aggregate&&!t.aggregate.includes('not found')&&!t.aggregate.includes('Delegated');})
+    .forEach(d=>{
+      const id=d.id.toLowerCase();
+      const t=editedTargets[d.id]||d.dddTarget;
+      const g=GROUPS.find(g=>g.keys.some(k=>id.includes(k)))||GROUPS[0];
+      gmap[g.name].push(t.aggregate);
+    });
+
+  // Arrow definitions: [from, to, label, color, dashed, markerId, labelXOffset, labelYOffset]
+  const ARROWS=[
+    {f:'Workspace & Identity',t:'Content Authoring', label:'access guard',      color:'#7c3aed',dashed:false,mid:'am-p', lx: 0, ly:-12},
+    {f:'Content Authoring',   t:'Publishing',        label:'content-event',     color:'#059669',dashed:true, mid:'am-g', lx: 0, ly:-12},
+    {f:'Content Authoring',   t:'Analytics',         label:'data-collection',   color:'#059669',dashed:true, mid:'am-g', lx: 0, ly: 14},
+    {f:'Content Authoring',   t:'External Systems',  label:'blob / VFS (HTTP)', color:'#2563eb',dashed:false,mid:'am-b', lx: 62, ly:  0},
+  ];
+
+  const LEGEND_Y=H-26;
+  return h('svg',{viewBox:`0 0 ${W} ${H}`,width:'100%',style:{display:'block',fontFamily:'inherit',background:'#fafbff',borderRadius:10}},
+    // Marker defs
+    h('defs',null,[
+      ...['am-p','am-g','am-b'].map(id=>h('marker',{key:id,id,markerWidth:8,markerHeight:8,refX:7,refY:3,orient:'auto'},
+        h('path',{d:'M0,0 L0,6 L8,3 z',fill:MCLR[id]})
+      )),
+      h('filter',{id:'lbl-shadow',x:'-5%',y:'-20%',width:'110%',height:'140%'},
+        h('feDropShadow',{dx:0,dy:1,stdDeviation:1,floodColor:'#000',floodOpacity:0.06})
+      )
+    ]),
+    // Legend strip background
+    h('rect',{x:0,y:LEGEND_Y-10,width:W,height:36,fill:'#f1f3f8',rx:0}),
+    // Context boxes
+    GROUPS.map(g=>{
+      const b=BOX[g.name];if(!b)return null;
+      const aggs=gmap[g.name]||[];
+      const maxShow=Math.floor((b.h-36)/18);
+      return h('g',{key:g.name},
+        h('rect',{x:b.x,y:b.y,width:b.w,height:b.h,rx:12,fill:g.color,stroke:g.border,strokeWidth:1.8}),
+        // Context name badge
+        h('rect',{x:b.x+8,y:b.y+7,width:b.w-16,height:18,rx:5,fill:g.border,opacity:0.15}),
+        h('text',{x:b.x+14,y:b.y+20,fontSize:10,fontWeight:700,fill:g.border},g.name),
+        // Aggregate list
+        ...aggs.slice(0,maxShow).map((agg,i)=>h('text',{key:i,x:b.x+16,y:b.y+36+i*18,fontSize:9,fill:'#374151'},
+          '• '+(agg.length>28?agg.slice(0,26)+'…':agg)
+        )),
+        aggs.length>maxShow&&h('text',{x:b.x+16,y:b.y+36+maxShow*18,fontSize:9,fill:'#94a3b8'},`+${aggs.length-maxShow} more`),
+        aggs.length===0&&h('text',{x:b.x+16,y:b.y+46,fontSize:9,fill:'#94a3b8',fontStyle:'italic'},'no aggregates assigned')
+      );
+    }),
+    // Arrows (drawn after boxes so labels sit on top)
+    ARROWS.map((arr,i)=>{
+      const pts=aline(arr.f,arr.t,arr.lx,arr.ly);if(!pts)return null;
+      const lblW=arr.label.length*5.2+14;
+      return h('g',{key:i},
+        h('line',{x1:pts.x1,y1:pts.y1,x2:pts.x2,y2:pts.y2,
+          stroke:arr.color,strokeWidth:1.8,
+          strokeDasharray:arr.dashed?'6,3':undefined,
+          markerEnd:`url(#${arr.mid})`}),
+        // Label pill — background then text
+        h('rect',{x:pts.lx-lblW/2,y:pts.ly-8,width:lblW,height:15,rx:5,
+          fill:'#fff',stroke:arr.color,strokeWidth:0.8,filter:'url(#lbl-shadow)'}),
+        h('text',{x:pts.lx,y:pts.ly+4,fontSize:8,fill:arr.color,textAnchor:'middle',fontWeight:600},arr.label)
+      );
+    }),
+    // Legend
+    h('g',{transform:`translate(14,${LEGEND_Y})`},
+      h('line',{x1:0,y1:5,x2:18,y2:5,stroke:'#059669',strokeWidth:1.8,strokeDasharray:'6,3',markerEnd:'url(#am-g)'}),
+      h('text',{x:22,y:9,fontSize:8,fill:'#64748b'},'Async event (Kafka)'),
+      h('line',{x1:150,y1:5,x2:168,y2:5,stroke:'#2563eb',strokeWidth:1.8,markerEnd:'url(#am-b)'}),
+      h('text',{x:172,y:9,fontSize:8,fill:'#64748b'},'HTTP / sync call'),
+      h('line',{x1:268,y1:5,x2:286,y2:5,stroke:'#7c3aed',strokeWidth:1.8,markerEnd:'url(#am-p)'}),
+      h('text',{x:290,y:9,fontSize:8,fill:'#64748b'},'Access guard'),
+      h('text',{x:390,y:9,fontSize:8,fill:'#94a3b8',fontStyle:'italic'},'⚠ Run relationship-analysis skill for verified arrows')
+    )
   );
 }
 
@@ -1393,6 +1724,8 @@ function App(){
   const[view,setView]=useState('current'); // 'current' | 'ddd' | 'gap'
   const[loading,setLoading]=useState(true);
   const[showAnalyze,setShowAnalyze]=useState(false);
+  const[editedTargets,setEditedTargets]=useState({});
+  const[ctxMapStatus,setCtxMapStatus]=useState('idle'); // 'idle' | 'generating' | 'ready'
   const[impactLoading,setImpactLoading]=useState(false);
   const[editDomain,setEditDomain]=useState(null); // domain object or null
   const[isNewDomain,setIsNewDomain]=useState(false);
@@ -1405,7 +1738,7 @@ function App(){
   };
 
   const loadService=async name=>{
-    setLoading(true);setImpact(null);setSelDomain(null);setSelAgg(null);setSelWf(null);
+    setLoading(true);setImpact(null);setSelDomain(null);setSelAgg(null);setSelWf(null);setEditedTargets({});setCtxMapStatus('idle');
     const r=await fetch(`${API}/api/analyze/${name}`);
     setData(await r.json());
     setActiveSvc(name);
@@ -1598,15 +1931,93 @@ function App(){
           )
         ),
 
-        // DDD Target view
+        // DDD Target view — shows output of domain-boundary-context-generation
         view==='ddd'&&h('div',null,
-          h(AggregateDiagram,{data,highlightId:selAgg}),
-          data.boundedContext&&h('div',null,
-            h('div',{className:'sec-title'},'Bounded Context'),
-            h(BoundedContextPanel,{bc:data.boundedContext})
+          // Toolbar
+          h('div',{className:'ddd-toolbar'},
+            h('div',{className:'sec-title',style:{margin:0}},
+              selAgg?`${selAgg} — Confirmed Aggregate Model`:'Confirmed Domain Model'
+            ),
+            h('button',{
+              className:`ctx-map-btn${ctxMapStatus==='ready'?' active':''}`,
+              disabled:ctxMapStatus==='generating',
+              onClick:ctxMapStatus==='generating'?null:()=>{
+                setCtxMapStatus('generating');
+                setTimeout(()=>setCtxMapStatus('ready'),1300);
+              }
+            },
+              ctxMapStatus==='idle'?'🗺️ Generate Context Diagram':
+              ctxMapStatus==='generating'?'⟳ Analyzing…':
+              '↻ Regenerate'
+            )
           ),
-          h('div',{className:'sec-title'},selAgg?`${selAgg} — Aggregate Model`:'Aggregate Models'),
-          h(AggregateCards,{domains:selAgg?data.domains.filter(d=>d.dddTarget?.aggregate===selAgg):data.domains,impact})
+          // Mining summary strip (domain-mining output)
+          (()=>{
+            const all=data.domains;
+            const good=all.filter(d=>d.health==='good').length;
+            const partial=all.filter(d=>d.health==='partial').length;
+            const anemic=all.filter(d=>d.health==='anemic').length;
+            const ctxCount=groupByContext(all,editedTargets).length;
+            return h('div',{className:'mining-summary'},
+              h('span',{className:'ms-stat'},h('strong',null,all.length),'domains analysed'),
+              h('span',{className:'ms-divider'},'·'),
+              h('span',{className:'ms-stat'},h('strong',null,good),'✅ Rich'),
+              h('span',{className:'ms-stat'},h('strong',null,partial),'🟡 Partial'),
+              h('span',{className:'ms-stat'},h('strong',null,anemic),'🔴 Anemic'),
+              h('span',{className:'ms-divider'},'·'),
+              h('span',{className:'ms-stat'},h('strong',null,ctxCount),'bounded contexts detected')
+            );
+          })(),
+          // Bounded context sections (confirmed bounded context output)
+          (()=>{
+            const sourceDomains=selAgg
+              ?data.domains.filter(d=>{const t=editedTargets[d.id]||d.dddTarget;return t?.aggregate===selAgg;})
+              :data.domains;
+            if(selAgg){
+              // Single aggregate filtered — skip grouping
+              return h(EditableAggregateCards,{
+                domains:sourceDomains,impact,editedTargets,
+                onEdit:(id,t)=>setEditedTargets(prev=>({...prev,[id]:t}))
+              });
+            }
+            const groups=groupByContext(sourceDomains,editedTargets);
+            return h('div',null,
+              groups.map(g=>h('div',{key:g.name,className:'ctx-section'},
+                h('div',{
+                  className:'ctx-section-hdr',
+                  style:{color:g.border,background:g.bg}
+                },
+                  h('span',{className:'ctx-name'},g.name),
+                  h('span',{className:'ctx-count'},`${g.domains.length} aggregate${g.domains.length===1?'':'s'}`)
+                ),
+                h(EditableAggregateCards,{
+                  domains:g.domains,impact,editedTargets,
+                  onEdit:(id,t)=>setEditedTargets(prev=>({...prev,[id]:t}))
+                })
+              ))
+            );
+          })(),
+          // Context diagram (spinner → SVG)
+          ctxMapStatus==='generating'&&h('div',{className:'ctx-map-section'},
+            h('div',{style:{display:'flex',alignItems:'center',gap:14,padding:'36px 0',justifyContent:'center',color:'#7c3aed',fontSize:13}},
+              h('div',{className:'spinner',style:{borderTopColor:'#7c3aed',width:20,height:20,borderWidth:2}}),
+              h('span',null,'Analyzing inter-aggregate relationships…')
+            )
+          ),
+          ctxMapStatus==='ready'&&h('div',{className:'ctx-map-section'},
+            h('div',{className:'ctx-map-hdr'},
+              h('div',{className:'sec-title',style:{margin:0}},'Bounded Context Diagram'),
+              h('span',{style:{fontSize:11,color:'#9AA7B4'}},'— reflects saved edits · run relationship-analysis skill for verified arrows')
+            ),
+            h(ContextMapSvg,{data:{...data,domains:data.domains.map(d=>({...d,dddTarget:editedTargets[d.id]||d.dddTarget}))},editedTargets}),
+            data.boundedContext&&h('div',{style:{marginTop:20}},
+              h('div',{className:'sec-title'},'Service Integration Contracts'),
+              h('div',{style:{fontSize:11,color:'#9AA7B4',marginBottom:10,marginTop:-6}},
+                'What this service owns, its external dependencies, and the events it publishes/consumes'
+              ),
+              h(BoundedContextPanel,{bc:data.boundedContext})
+            )
+          )
         ),
 
         // Gap Analysis view

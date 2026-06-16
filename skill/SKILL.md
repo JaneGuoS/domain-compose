@@ -1,962 +1,230 @@
 ---
 name: domain-compose
-argument-hint: "[--refactor] [--yes] [PROJ-123 | github-url | repo-name | description | mockup image]"
-description: "Two modes: (1) design a new domain from a requirement — aggregates, entities, value objects, domain events, infrastructure map, architecture diagram; (2) --refactor an existing repo to DDD — analyzes violations, produces before/after design with confirmation gate, then chains into plan→execute→verify. Add --yes to skip all questions and run fully automated. Inputs: Jira ticket, GitHub URL, repo name, Confluence page, plain description, or mockup image."
+argument-hint: "[--refactor] [--impact <requirement>] [--yes] [PROJ-123 | github-url | repo-name | description | mockup image]"
+description: "Orchestrator skill. Routes to the right sub-skill based on flags: (1) no flags = design a new domain from a requirement; (2) --refactor = run domain-analysis then produce DDD gap report and target design; (3) --impact = run impact-analysis for a requirement. See sub-skills for full detail."
+---
+
+## Skills (focused capabilities)
+
+| Skill | What it does |
+|-------|-------------|
+| [`domain-analysis`](domain-analysis/SKILL.md) | Discovers domains from a codebase, verifies uniqueness + coverage, extracts inter-domain relationships → `docs/<service>-domain-map.json` |
+| [`domain-mining`](domain-mining/SKILL.md) | Enriches a domain map: rich/anemic classification, value object candidates, missing events, misplaced business rules |
+| [`bounded-context`](bounded-context/SKILL.md) | Groups aggregates into bounded contexts by DB/provider/Kafka cohesion, produces ASCII context map with relationship types |
+| [`relationship-analysis`](relationship-analysis/SKILL.md) | Scans real code (FKs, HTTP calls, Kafka flows, shared VOs) to find and classify actual inter-aggregate relationships. Always called before diagram generation to ensure arrows are correct |
+| [`ddd-target`](ddd-target/SKILL.md) | Generates the HTML DDD target design per bounded context, using verified relationship data for correct event arrows |
+| [`impact-analysis`](impact-analysis/SKILL.md) | Given a requirement, classifies each domain as direct/indirect/none impact |
+
+## Agents (composed workflows with memory)
+
+| Agent | Composes | What it does |
+|-------|---------|-------------|
+| [`domain-boundary-context-generation`](../agents/domain-boundary-context-generation.md) | domain-mining + bounded-context | Orchestrates both skills sequentially, holds context across them, manages engineer confirmation gates, returns a confirmed domain model + context boundaries |
+| [`ddd-critic`](../agents/ddd-critic.md) | — | Challenges the confirmed model across 5 lenses: technical vs domain boundaries, naming, aggregate sizing, missing concepts, relationship risks. Numbered findings for selective acceptance |
+| [`draw-ddd-context-diagram`](../agents/draw-ddd-context-diagram.md) | relationship-analysis + ddd-target | Runs `relationship-analysis` first (verified relationships from code), then `ddd-target` (per-context HTML), then generates the context map SVG using only code-verified relationship arrows |
+
 ---
 
 ## Flags
 
 | Flag | Meaning |
 |------|---------|
-| `--refactor` | Refactor mode — analyze existing repo for DDD violations |
-| `--impact <requirement>` | Impact mode — given a new requirement, highlight which domains and workflows are affected |
-| `--domain <name>` | Focus refactor on a single named bounded context (e.g. `--domain Lesson`) |
-| `--depth <1\|2\|3>` | Design depth — controls how detailed each DDD design is (default: 1) |
-| `--yes` | Skip all questions and confirmation gates. Run fully automated. |
+| `--refactor` | Analyse an existing repo → DDD gap report + target design |
+| `--impact <requirement>` | Given a requirement, highlight impacted domains and workflows |
+| `--domain <name>` | Focus refactor on a single named bounded context |
+| `--depth <1\|2\|3>` | DDD target design detail level (default: 1) |
+| `--yes` | Skip all confirmation gates, run fully automated |
 
-## Design depth levels (--depth)
+---
 
-`--depth` controls **only the DDD target design** (`docs/{service}-ddd-target.html`). The domain workflow map (`docs/{service}-domain-map.html`) always shows the full picture regardless of depth.
+## Routing
+
+```
+domain-compose <input>
+  │
+  ├─ --refactor ──► domain-analysis (skill)
+  │                      ↓
+  │               domain-boundary-context-generation (agent)
+  │                ├─ domain-mining (skill)         ← [user confirms]
+  │                └─ bounded-context (skill)        ← [user confirms]
+  │                      ↓
+  │               ddd-critic (agent)                 ← [user accepts/rejects]
+  │                      ↓
+  │               draw-ddd-context-diagram (agent)
+  │                ├─ relationship-analysis (skill)  ← verifies inter-aggregate links from code
+  │                ├─ ddd-target (skill)             ← per-context aggregate model HTML
+  │                └─ context-map.html (generated using verified relationships)
+  │                      ↓ → /plan
+  │
+  ├─ --impact   ──► impact-analysis (skill) → annotated HTML map
+  │
+  └─ (none)     ──► Design mode (below)
+```
+
+---
+
+## MODE: --refactor
+
+**Step 1 — Run domain-analysis**
+
+Invoke `domain-analysis` on the input repo. Wait for the verified `docs/<service>-domain-map.json`.
+
+The domain-analysis skill enforces:
+- Unique domain names (no duplicates)
+- 100% controller/app-service coverage
+- One aggregate per domain
+- Explicit inter-domain relationships
+
+Do not proceed to Step 2 if coverage < 100% or any duplicate names. Fix issues first.
+
+---
+
+**Step 2 — Domain Boundary & Context Generation** (`domain-boundary-context-generation` agent)
+
+<!-- Agent dispatch: domain-boundary-context-generation (agents/domain-boundary-context-generation.md) -->
+
+This agent runs `domain-mining` and `bounded-context` skills in sequence, managing confirmation gates internally. It returns a single confirmed domain model + context boundaries.
+
+Dispatch `domain-boundary-context-generation` agent with `REPO`, `DOMAIN_MAP_JSON`, and `YES_MODE`. The agent internally:
+1. Runs `domain-mining` skill → presents results → waits for engineer confirmation
+2. Runs `bounded-context` skill with confirmed mining output → presents context map → waits for confirmation
+
+The agent returns `CONFIRMED_MODEL` (aggregate health + enrichments + context boundaries + ASCII map).
+
+If `--yes` is set: agent skips both confirmation gates automatically.
+
+---
+
+**Step 3 — DDD Critic** (`ddd-critic` agent)
+
+<!-- Agent dispatch: ddd-critic (agents/ddd-critic.md) -->
+
+Dispatch `ddd-critic-agent` with `REPO`, `DOMAIN_MAP_JSON`, confirmed mining output, and confirmed context output. Present in chat:
+
+> **🔍 DDD Critic — Agent 3 complete**
+>
+> **N findings:** ❌ N high · ⚠️ N medium · ℹ️ N low
+>
+> [Finding #1] — TECHNICAL vs DOMAIN BOUNDARY ❌
+> {challenge text}
+>
+> [Finding #2] — NAMING ANTI-PATTERN ⚠️
+> {challenge text}
+>
+> ...
+>
+> **Survives critique:** {list}
+>
+> Which findings do you want to incorporate?
+> - **A — Accept all**
+> - **B — Select** → list numbers (e.g. "1, 3")
+> - **C — Reject all**
+
+Wait for response. If `--yes`: accept all High and Medium findings.
+
+---
+
+**Step 4 — Draw DDD Context Diagram** (`draw-ddd-context-diagram` agent)
+
+<!-- Agent dispatch: draw-ddd-context-diagram (agents/draw-ddd-context-diagram.md) -->
+
+Dispatch `draw-ddd-context-diagram` agent with `CONFIRMED_MODEL`, `SERVICE_NAME`, `REPO`, and `DOCS_DIR`.
+
+The agent produces:
+- `docs/{service}-context-map.html` — SVG showing all bounded contexts and relationships
+- `docs/{service}-ddd-target-{context}.html` per bounded context (or single `ddd-target.html`)
+
+Both files are auto-opened in the browser. The DomainCompose Studio app also reflects the updated model — engineers can edit aggregate fields in-app and regenerate the context diagram from the updated state.
+
+Depth levels (`--depth 1|2|3`) are passed through to the agent.
+
+---
+
+**Step 5 — Confirmation gate**
+
+Present summary. Skip if `--yes`.
+
+---
+
+**Step 6 — DDD target design** (`ddd-target` skill — optional, for written design doc)
+
+Invoke `ddd-target` with the confirmed + critiqued domain map.
+
+If multi-context detected (Step 3):
+- Write `docs/<service>-context-map.html` — SVG context map with all contexts, relationships, ACL markers
+- Write `docs/<service>-ddd-target-<context>.html` per context
+
+If single context:
+- Write `docs/<service>-ddd-target.html`
+
+Depth levels (`--depth 1|2|3`):
+
+| Depth | Includes |
+|-------|---------|
+| 1 | Aggregate roots, value objects, lifecycle, invariants, commands → events |
+| 2 | + Child entities, domain services, exception types, application use cases |
+| 3 | + Value object validation, repository interfaces, factory signatures, DB tables |
+
+Auto-open all generated files in browser.
+
+**Step 6 — Confirmation gate**
+
+Present summary:
+> "**N bounded contexts · N aggregate roots · N VO candidates · N missing events**
+>
+> Critic findings applied: {list accepted}
+>
+> How to proceed?
+> - A — Full refactor (all contexts) → plan
+> - B — One context first → which?
+> - C — Revise the design"
+
+Skip if `--yes`.
+
+**Step 7 — Hand off**
+
+Write `docs/domain-refactor-<area>.md` including:
+- Bounded context summary
+- Mining findings incorporated
+- Critic findings accepted
+- Observable truths (what must be true for refactor to be complete)
+
+Output:
+> "✅ Run `/seismic-engineering:plan docs/domain-refactor-<area>.md`"
+
+---
+
+## MODE: --impact
+
+Invoke `impact-analysis` with the requirement and `--service <name>`.
+
+The impact-analysis skill:
+- Classifies each domain as `direct`, `indirect`, or `none`
+- Propagates impact along the `relationships` graph
+- Identifies affected workflow steps
+- Writes an annotated HTML map
+
+---
+
+## MODE: Design (no flags)
+
+Model a new domain from a business requirement. See `domain-compose/SKILL.md` for the full design workflow (Steps 0–7: enrich input → clarify → model → infrastructure map → use cases → write doc → architecture diagram → hand off to plan).
+
+---
+
+## Design depth levels
 
 | Level | DDD target includes | Best for |
 |-------|-------------------|---------|
-| `--depth 1` *(default)* | Aggregate roots, value objects, lifecycle states, invariants, commands → domain events | Quick overview, onboarding, demos |
-| `--depth 2` | Depth 1 + child entities with fields, domain service rules, domain exception types, application use cases per endpoint | Sprint planning, team design review |
-| `--depth 3` | Depth 2 + value object validation rules, repository interfaces, factory signatures, domain service interfaces, exact provider method signatures, DB table names | Implementation handoff — feeds directly into `plan` → `execute` |
-
-**Rule:** Higher depth means more codebase reading by the analyzer. `--depth 3` traces more request paths and reads more provider interfaces — expect longer runtime.
-
-## Modes
-
-| Input | Mode |
-|-------|------|
-| No flags | **Design mode** — model a new domain feature from a requirement |
-| `--refactor` | **Refactor mode** — detect bounded contexts, generate a separate DDD design per context |
-| `--refactor --domain <name>` | **Single-domain refactor** — generate DDD design for one bounded context only |
-| `--impact <requirement>` | **Impact mode** — highlight affected domains and workflows for a new requirement |
-
-**If `--yes` is present:** skip every step that says "ask", "wait for", or "confirm". All decisions default to full scope.
-
-## Multi-domain detection (--refactor)
-
-When `--domain` is not specified, the skill automatically detects whether the service contains multiple distinct bounded contexts before producing any DDD design.
-
-**Bounded context detection rules** (applied to the domain workflow map):
-
-A set of domains forms a **separate bounded context** if:
-- They share no aggregate roots or domain events with the other domains
-- They have distinct external providers not shared with other domain groups
-- They could plausibly be extracted as a separate service without breaking the others
-- Their workflows do not cross into other domain groups
-
-**Output for multi-domain services:**
-
-Instead of one DDD design, produce:
-1. A **bounded context index** (`docs/{service}-bounded-contexts.html`) — overview showing all detected contexts, which domains belong to each, and the rationale for the split
-2. A **separate DDD architecture diagram** per bounded context (`docs/{service}-ddd-architecture-{context}.html`)
-3. A **separate DDD target design** per bounded context (`docs/{service}-ddd-target-{context}.html`)
-
-Open all files in the browser and print a summary:
-```
-📋 Detected 3 bounded contexts:
-   1. Lesson    → docs/{service}-ddd-target-lesson.html
-   2. Reporting → docs/{service}-ddd-target-reporting.html
-   3. User      → docs/{service}-ddd-target-user.html
-
-Use --domain <name> to focus on one context.
-```
-
-If `--domain <name>` is provided, skip detection and generate only the design for that context.
-
-Both Design and Refactor modes produce a domain design document and chain into `/seismic-engineering:plan`.
+| `--depth 1` *(default)* | Aggregate roots, value objects, lifecycle states, invariants, commands → domain events | Quick overview, demos |
+| `--depth 2` | Depth 1 + child entities, domain service rules, exception types, application use cases | Sprint planning, team review |
+| `--depth 3` | Depth 2 + value object validation, repository interfaces, factory signatures, provider methods, DB tables | Implementation handoff |
 
 ---
 
-# MODE 3: Impact (--impact)
-
-Given a new requirement and an existing domain map, highlight which domains and workflows are directly affected, partially affected, or unaffected. Opens the annotated domain map in the browser.
-
-```
-New Requirement
-        ↓
-/seismic-engineering:domain-compose --impact "<requirement>" [--yes]
-  → Reads existing docs/{service}-domain-map.html (or regenerates if missing)
-  → Analyses which domains and workflows the requirement touches
-  → Writes docs/{service}-domain-map-impact.html with highlighted annotations
-  → Opens in browser
-```
-
-## I-Step 0 — Parse the requirement
-
-Accept the requirement as:
-- Free-text description after `--impact`
-- Jira ticket ID → fetch via Atlassian MCP (`getJiraIssue`)
-- Confluence URL → fetch via `getConfluencePage`
-
-Extract: what is being added or changed, which entities or operations are mentioned, which external systems are involved.
-
-## I-Step 1 — Load the domain map
-
-Check for `docs/{service}-domain-map.html` in the current directory. If missing, run the domain map generation step (R-Step 2 from refactor mode) first.
-
-Read the domain map to understand the full list of domains, their operations, and workflows.
-
-## I-Step 2 — Analyse impact
-
-For each domain in the map, classify:
-
-| Classification | Meaning | Visual |
-|---------------|---------|--------|
-| 🔴 Directly impacted | Requirement adds/changes operations in this domain or modifies its workflows | Red highlight + IMPACTED badge |
-| 🟡 Indirectly impacted | Requirement touches a domain event or integration that this domain depends on | Amber highlight + AFFECTED badge |
-| ⚪ Not impacted | No connection to this requirement | Dimmed / greyed |
-
-For each workflow in the map, mark each step that the requirement touches with a coloured indicator.
-
-## I-Step 3 — Write the annotated domain map
-
-Write `docs/{service}-domain-map-impact.html` — the existing domain map with:
-- A banner at the top showing the requirement summary
-- Each domain card highlighted according to its impact classification
-- Each workflow step annotated with an impact indicator where relevant
-- A legend explaining the colour coding
-- A summary panel: "X domains directly impacted, Y indirectly affected, Z unchanged"
-
-Then open it:
-```bash
-open "docs/{service}-domain-map-impact.html" 2>/dev/null || \
-  xdg-open "docs/{service}-domain-map-impact.html" 2>/dev/null || true
-echo "📄 Impact map: $(pwd)/docs/{service}-domain-map-impact.html"
-```
-
----
-
-# MODE 1: Design (new feature)
-
-```
-Business Requirement
-        ↓
-/seismic-engineering:domain-compose        ← you are here
-  → docs/domain-design-{feature}.md
-        ↓
-/seismic-engineering:plan
-        ↓
-/seismic-engineering:execute --functional → --harden
-        ↓
-/seismic-engineering:verify
-```
-
-## Step 0 — Enrich input
-
-Run all applicable sources in parallel.
-
-### 0a. Jira enrichment
-
-If input contains `[A-Z]+-[0-9]+`, call via Atlassian MCP:
-
-```
-getJiraIssue(ticketId)                    → summary, description, ACs, labels
-getJiraIssueRemoteIssueLinks(ticketId)    → linked Confluence pages, related tickets
-```
-
-For each Confluence URL found, call `getConfluencePage`.
-
-**Scope authority:** ticket title + description define scope. Confluence = business vocabulary only.
-
-### 0b. Requirement page enrichment
-
-If input contains a Confluence URL (e.g. `https://*.atlassian.net/wiki/...`), call `getConfluencePage` directly and extract:
-- Domain concepts (entities, states, actors, business rules in prose)
-- Existing service dependencies named
-- Any stated constraints or non-functional requirements
-
-### 0c. Mockup / image enrichment
-
-If input is an image or Figma export, read it and extract:
-- **Nouns visible in UI** → candidate aggregate roots
-- **Verbs / button labels** → candidate commands
-- **Status badges / state flows** → candidate lifecycle states and domain events
-- **Actor labels** → bounded context actors
-
-### 0d. Repo pattern discovery
-
-Dispatch `domain-compose-researcher` to surface existing patterns the new domain must be consistent with. Wait for output before Step 1.
-
-<!-- Agent dispatch: dispatched automatically in Step 0d
-     - domain-compose-researcher (plugins/seismic-engineering/agents/domain-compose-researcher.md)
--->
-
----
-
-## Step 1 — Clarifying questions (business-only)
-
-Ask at most **3 questions**, one at a time. Each: 3 relevant options + "Other — describe below". Stop when you have enough to model.
-
-**Good:** "Who initiates this — user, admin, or automated system?", "What are the lifecycle states of X?", "When X happens, what else needs to know?"
-
-**Never ask:** ORM choice, REST vs GraphQL, class naming.
-
-Skip entirely if the requirement already answers all business questions.
-
----
-
-## Step 2 — Model the domain
-
-Perform the full domain analysis yourself — do not delegate.
-
-### 2a. Bounded context
-- **Owns:** data, decisions, rules
-- **Depends on:** external services called
-- **Publishes:** SEB topics emitted
-- **Consumes:** SEB topics subscribed to
-
-### 2b. Aggregate roots
-```
-Name:      {Name}Entity
-Identity:  [unique field(s)]
-Invariants:
-  - "A {Name} cannot [action] unless [condition]"
-Lifecycle: [none | draft → published → archived | ...]
-Commands:
-  - Create{Name}(actorId, {Name}Request) → raises {Name}Created
-  - Publish{Name}(actorId, id)           → raises {Name}Published
-```
-Invariants enforced **inside aggregate methods** — not in application services.
-
-### 2c. Entities (non-root)
-Child entities with identity belonging to one aggregate.
-
-### 2d. Value objects
-Immutable, identity by value.
-```
-Name:        {Name}
-Fields:      [field: type, ...]
-Validation:  [rules that make it invalid]
-Polymorphic: yes/no — if yes, list subtypes
-```
-
-### 2e. Domain services
-Cross-aggregate logic or invariants requiring external reads.
-
-### 2f. Domain exceptions
-Extend existing `DomainExceptionType` enum (check researcher output for existing values):
-
-| New Type | HTTP | When thrown |
-|----------|------|-------------|
-| `{Feature}NotFound` | 404 | Aggregate not found |
-| `{Feature}Duplicate` | 400 | Uniqueness invariant violated |
-| `{Feature}PermissionDenied` | 403 | Actor lacks access |
-
----
-
-## Step 3 — Infrastructure mapping
-
-For each: **needed / not needed / already exists**.
-
-### 3a. Database (Postgres)
-| Table | Purpose | Key columns | Multi-tenant? | Access pattern |
-|-------|---------|-------------|---------------|----------------|
-| `{feature}s` | ... | id UUID, tenant_id, status, created_at | Yes | Dapper via `{Feature}DomainJobs` |
-
-### 3b. External service providers
-| Provider | Interface | Operations needed | Status |
-|----------|-----------|-------------------|--------|
-| `CMSServiceProvider` | `ICMSServiceProvider` | `Create{Feature}Async` | Extend (partial class) |
-| `{New}ServiceProvider` | `I{New}ServiceProvider` | ... | Create |
-
-### 3c. SEB — consumed
-| Topic | Event type | Format | BackgroundService | Purpose |
-|-------|-----------|--------|--------------------|---------|
-| `{topic}` | `{EventType}` | Avro | `{Feature}EventConsumer` | ... |
-
-For each new consumer:
-- `IAvroClientFactory.CreateAvroSubscriber(topic, region, ConsumerSetting { EnableAutoCommit = false })`
-- DI scope per event via `IServiceScopeFactory`
-
-### 3d. SEB — published
-| Topic | Event type | Triggered by | Downstream consumers |
-|-------|-----------|--------------|---------------------|
-| `channel.{feature}.{verb}` | `{Feature}{Verb}Event` | `{Command}` | Search, Analytics |
-
-### 3e. Internal event queues
-| Queue type | Producer | Consumer | Purpose |
-|------------|---------|---------|---------|
-| `Channel<{Feature}NotificationRequest>` | `{Feature}AppService` | `{Feature}NotificationConsumer` | Async notification |
-
----
-
-## Step 4 — Application use cases
-
-One entry per API endpoint:
-
-```
-{N}. {OperationName}({actorId}, {RequestType})
-   Actor:         [user | admin | system]
-   Guard:         [permission — via which service/provider]
-   Guard:         [business invariant — enforced by aggregate]
-   Load:          [what from which provider]
-   Create/Mutate: [aggregate constructor or command]
-   Persist:       [{Provider}.{Method}Async()]
-   Dispatch:      [NotificationEventQueue.Enqueue(...)]
-   Publish:       [{EventSender}.SendAsync(...) → SEB]
-   Return:        [{Entity}]
-```
-
----
-
-## Step 5 — Write the Domain Design Document
-
-Write to `docs/domain-design-{feature-name}.md`:
-
-```markdown
-# Domain Design: {Feature Name}
-
-_Generated by /seismic-engineering:domain-compose — input to /seismic-engineering:plan_
-
-## Bounded Context
-**Owns:** ...  **Depends on:** ...  **Publishes:** ...  **Consumes:** ...
-
-## Aggregate Model
-### {Name}Entity
-**Identity:** ...  **Lifecycle:** ...
-**Invariants:** ...
-**Commands & Domain Events:**
-| Command | Pre-conditions | Enforced by | Domain Event |
-|---------|---------------|-------------|--------------|
-
-### Entities / Value Objects
-...
-
-## Domain Exceptions
-| DomainExceptionType | HTTP | When |
-...
-
-## Infrastructure Map
-### Database | Providers | SEB Consumed | SEB Published | Internal Queues
-...
-
-## Application Use Cases
-...
-
-## Architecture Diagram
-[Mermaid]
-```
-
----
-
-## Step 6 — Generate architecture diagram
-
-Produce a Mermaid `graph TD` with subgraphs for all four layers and edges for every infrastructure dependency. Output as HTML file and attempt to open in browser (see output instructions below).
-
-```mermaid
-graph TD
-    subgraph API["API Layer"]
-        CTRL["{Feature}Controller"]
-    end
-    subgraph APP["Application Layer"]
-        AAS["{Feature}AppService"]
-    end
-    subgraph DOMAIN["Domain Layer"]
-        AE["{Feature}Entity (aggregate root)"]
-        DS["{Feature}Service"]
-        NEQ["Internal Queue"]
-    end
-    subgraph INFRA["Infrastructure Layer"]
-        CMS["CMSServiceProvider (extended)"]
-        NEC["{Feature}NotificationConsumer"]
-        SEB_OUT["SEB → channel.{feature}.{verb}"]
-        SEB_IN["SEB ← {topic} / {Feature}EventConsumer"]
-        DB[("Postgres")]
-    end
-    CTRL --> AAS
-    AAS --> AE & DS
-    DS --> CMS & SEB_OUT
-    AAS --> NEQ --> NEC --> NOTIF["NotificationServiceProvider"]
-    SEB_IN --> AAS
-    DB --> CMS
-```
-
----
-
-## Step 7 — Hand off to plan
-
-Output:
-
-> "✅ Domain design written to `docs/domain-design-{feature}.md`.
->
-> **Next:** Run `/seismic-engineering:plan docs/domain-design-{feature}.md`
->
-> **Infrastructure gaps for plan to address:**
-> - [ ] DB migration / Dapper queries  (if new tables)
-> - [ ] `{Feature}DomainJobs` scaffold  (if Postgres direct access)
-> - [ ] SEB consumer BackgroundService  (if consuming events)
-> - [ ] SEB event publisher             (if publishing events)
-> - [ ] Internal queue + consumer       (if async notifications)"
-
----
-
----
-
-# MODE 2: Refactor (--refactor)
-
-Analyze an existing service for DDD violations, produce a before/after migration design, get engineer confirmation, then chain into plan.
-
-## Environment-aware output
-
-This skill runs in two environments with different rendering capabilities. Detect and adapt:
-
-| Environment | Detection | Output method |
-|-------------|-----------|---------------|
-| Cowork (chat UI) | `show_widget` tool available | Render diagrams inline AND write HTML files |
-| Claude Code CLI | `show_widget` not available | Write HTML files only; print absolute file paths to stdout |
-
-**For every diagram or design output:**
-1. Always write a self-contained HTML file to the output path
-2. Attempt to open in browser: `open <file> 2>/dev/null || xdg-open <file> 2>/dev/null || true`
-3. **Always print the absolute path** regardless of whether open succeeded:
-   ```
-   📄 Output written: /absolute/path/to/file.html
-      Open manually if browser didn't launch.
-   ```
-4. Never silently fail — the engineer must always know where the files are
-
-```
-Existing Repo + Requirement Context
-        ↓
-/seismic-engineering:domain-compose --refactor   ← you are here
-  → DDD Gap Report (shown inline, confirmation required)
-  → docs/domain-refactor-{area}.md (written after confirmation)
-        ↓
-/seismic-engineering:plan docs/domain-refactor-{area}.md
-        ↓
-/seismic-engineering:execute --functional → --harden
-        ↓
-/seismic-engineering:verify
-```
-
-## R-Step 0 — Enrich all input sources in parallel
-
-Accept any combination of inputs. **Never ask the engineer to mount or add a folder** — resolve the repo via URL or name automatically.
-
-| Input type | Action |
-|------------|--------|
-| GitHub / GitLab URL | Clone via `gh repo clone <org/repo> /tmp/<repo> -- --depth 1 --filter=blob:none` — no folder mounting needed |
-| Repo name only (e.g. `channel-service`) | `gh repo clone seismic/<name> /tmp/<name> -- --depth 1 --filter=blob:none` |
-| Jira ticket ID | `getJiraIssue` + `getJiraIssueRemoteIssueLinks` via Atlassian MCP |
-| Confluence URL | `getConfluencePage` — extract business intent, domain vocabulary, stated rules |
-| Plain description | Use as refactoring intent / business context |
-
-If no repo is provided at all, ask once: "What is the GitHub URL or repo name to refactor?"
-
-<!-- Agent dispatch: dispatched automatically in R-Step 0
-     - domain-refactor-analyzer (plugins/seismic-engineering/agents/domain-refactor-analyzer.md)
--->
-
----
-
-## R-Step 1 — Visualize current architecture
-
-Before any gap analysis, draw the current repo's architecture so the engineer can see what exists today. **The diagram must be built entirely from the analyzer's Structural Map — never inferred from project naming.**
-
-### 1a. Source of truth rules
-
-Use ONLY these inputs from the analyzer output to build the diagram:
-- **Project → DDD role** classification (from Phase 2c observed code, not assumed from name)
-- **Dependency graph edges** (from actual `.csproj` `<ProjectReference>` entries)
-- **Request flow traces** (from Phase 4 actual method-level tracing)
-- **DI registrations** (from Phase 3 actual startup code)
-
-If any project was classified as `mixed` (contains multiple DDD layers), show it in its own row with a red border — it is itself a violation.
-
-If the analyzer could not determine a project's role with confidence, show it as `? unknown` and do not guess.
-
-### 1b. Architecture diagram (written to an HTML file and auto-opened if possible)
-
-Build an HTML widget with:
-
-**Layout:** Horizontal layer bands stacked vertically. Within each band, one box per project (using the actual project short name, not the full namespace). Arrange boxes left-to-right following the dependency graph direction.
-
-**Dependency arrows:** Show the primary call chain from the traced request flows as arrows between boxes. Do not draw arrows that weren't observed — use `···` (dotted border) for projects whose connections are unconfirmed.
-
-**Violation highlighting:**
-- 🔴 Red box border + light red background — P0 violation found inside this project
-- 🟡 Amber box border + light yellow background — P1 violation
-- Normal box — no violations found
-
-**Layer color conventions (background of the band):**
-- `presentation` → blue tint `#e8f4fd`
-- `application` → yellow tint `#fff8e1`
-- `domain` / `domain-contracts` → pink tint `#fce4ec`
-- `infrastructure` / `background` → green tint `#e8f5e9`
-- `shared-kernel` → purple tint `#f3e5f5`
-- `mixed` → orange tint `#fff3e0` with red border — always a violation
-
-**Legend:** Color coding + violation severity key.
-
-### 1c. Workflow narrative (prose, below diagram)
-
-Write ≤5 sentences describing the **observed** primary request flow using the traced paths from the analyzer — not a generic description. Quote the actual class names and method names from the traces.
-
-Example of the required specificity:
-> "`LibraryController.GetItemAsync` calls `LibraryService.GetAsync`, which resolves `IItemRepository` via service locator (`ServiceCollectionHelper.GetSingletonService`), then calls `ItemRepository.QueryAsync` which issues raw SQL via Dapper against the `items` table."
-
-If `--yes` is set, continue immediately. Otherwise ask: **"Does this accurately reflect the architecture? Reply 'yes' to continue or describe corrections."** and wait.
-
-If the engineer corrects the diagram, update it and re-present. Only continue when the engineer confirms accuracy.
-
----
-
-## R-Step 2 — Generate domain workflow map
-
-Before any DDD design, produce an accurate map of what the service actually does — the domains, workflows, and external integrations as they exist today. This becomes the source of truth for the DDD target design in R-Step 3.
-
-### 2a. Discover all domains
-
-From the analyzer's structural map and the codebase:
-```bash
-# What domain areas exist?
-ls <repo>/src/<DomainProject>/
-# What application service operations exist?
-grep -rn "public.*Task\|public.*Async" <repo>/src/<ApplicationProject> --include="*.cs" | grep -v "//" | head -40
-# What controllers expose?
-find <repo>/src -name "*Controller.cs" | grep -v test | xargs -I{} basename {} .cs | sort
-```
-
-For each domain area found, record:
-- **Name** (e.g. Channel, Post, Announcement)
-- **Operations** — list of user-facing actions derived from controller endpoints and app service methods
-- **Domain model health** — does it have an entity with invariant methods (rich) or just data properties (anemic)?
-
-### 2b. Trace key workflows
-
-Identify 4–6 significant workflows by reading the app service methods that involve the most cross-domain coordination. For each workflow, trace the full step sequence: API entry → domain logic → persistence → events/notifications.
-
-### 2c. Map external integrations
-
-```bash
-# Kafka topics (consumed and published)
-grep -rn "EventTopics\.\|_topic\s*=\|TopicConstants\." <repo>/src --include="*.cs" | grep -v test | head -20
-# External service providers
-find <repo>/src -path "*/DataAccess/*" -name "I*.cs" | xargs -I{} basename {} .cs | sort
-# Background services
-find <repo>/src -name "*Consumer.cs" -o -name "*Executor*.cs" -o -name "*BackgroundService*.cs" | grep -v test | xargs -I{} basename {} .cs
-```
-
-### 2d. Output: domain workflow map HTML
-
-Write a self-contained HTML file to `docs/{service-name}-domain-map.html` containing:
-- **Domain cards grid** — one card per domain, listing operations and model health badge (rich / partial / anemic)
-- **Key workflow steps** — each workflow as a horizontal step chain with color-coded step types (API call, domain operation, external provider, Kafka event, background service, notification)
-- **External integrations** — Kafka IN/OUT, HTTP providers, internal infrastructure
-
-Use the same visual style as the channel-service and content-manager-service examples:
-- Domain cards: color-coded by domain type, 3-column grid
-- Workflow steps: inline chips with arrows, color per step type
-- Integrations: 4-column grid
-
-Write the file to `docs/{service-name}-domain-map.html`, then **automatically open it in the browser**:
-```bash
-# Try to open — works in Cowork/macOS desktop; silently skips in headless CLI
-open "docs/{service-name}-domain-map.html" 2>/dev/null || \
-  xdg-open "docs/{service-name}-domain-map.html" 2>/dev/null || true
-# Always print the path so the engineer can open it manually
-echo "📄 Domain map: $(pwd)/docs/{service-name}-domain-map.html"
-```
-
-If `--yes` is set, continue immediately. Otherwise ask: **"Does this domain map accurately reflect the service?"** and wait.
-
----
-
-## R-Step 3 — Design DDD target from the domain map
-
-Using the confirmed domain workflow map as the authoritative source of truth, design what the service **should** look like in DDD terms. This is the target state — not a critique of current code, but a forward-looking design.
-
-### 3a. Define bounded context
-
-From the domain map, state:
-- **Core domain**: the primary business capability (what this service uniquely owns)
-- **Supporting domains**: areas that support the core but could be separate
-- **Context boundary**: what this service owns vs. what belongs to external services
-
-### 3b. Design aggregate roots for each domain
-
-For each domain area in the map, decide:
-
-```
-Domain: {Name}
-Aggregate root: {Name}Entity
-  Identity: [what uniquely identifies it]
-  Invariants (from observed business rules in workflows):
-    - "{Name} cannot [action] unless [condition]"
-    - [derive from: what guards exist in app services? what state transitions appear in workflows?]
-  Lifecycle: [none | draft → published → archived | ...]
-  Commands (from workflow steps that mutate state):
-    - Create{Name}(actorId, {Name}Request) → raises {Name}Created
-    - [one command per state-mutating workflow step]
-  Domain events (from workflow steps that notify/publish):
-    - {Name}Created → [who needs to know]
-    - {Name}Published → [downstream: Kafka, notification, other domain]
-```
-
-**Key rule:** If a workflow step currently sets a field externally (e.g. `itemVersion.Status = X` in a Writer class), that step belongs as a command method on the aggregate.
-
-### 3c. Identify value objects
-
-From the domain map, find concepts that appear repeatedly as raw strings or primitives but carry business meaning:
-- Status values that have valid transitions → `{Name}Status` enum + aggregate method
-- Compound identifiers used together → value object
-- Reusable structures across domains → shared value object
-
-### 3d. Map domain events to infrastructure
-
-For each workflow in the domain map that ends with a Kafka publish or notification:
-
-| Workflow trigger | Domain event | Internal queue | Kafka topic | Downstream |
-|-----------------|-------------|----------------|-------------|------------|
-| Post created | PostCreated | NotificationEventQueue | ContentIngested | Search, Analytics |
-
-### 3e. Draw the aggregate context diagram
-
-Before writing any domain descriptions, produce an SVG/HTML diagram showing the full DDD structure. This is the centrepiece of the target design — not a layer diagram, but a **domain model diagram** showing:
-
-**What to include:**
-
-1. **Bounded context boundary** — a single outer box labelled with the service name and core domain statement
-
-2. **Aggregate roots** — solid-bordered boxes, one per aggregate. Each contains:
-   - The aggregate root entity name (bold)
-   - Its child entities (dashed inner boxes)
-   - Its value objects (small rounded pill shapes inside)
-   - Its lifecycle states shown as a mini state machine: `draft → active → expired`
-
-3. **Domain services** — hexagons sitting between aggregates they orchestrate
-
-4. **Domain events** — arrows between aggregates/services labelled with the event name. Distinguish:
-   - Internal domain events (solid arrow, dark)
-   - Kafka OUT events (arrow to external boundary, orange)
-   - Kafka IN events (arrow from external boundary, blue)
-
-5. **External boundary** — a dashed outer ring showing:
-   - HTTP providers (CMS, UMS, VFS, etc.) as external boxes
-   - Kafka topics (IN and OUT) as labelled connectors on the boundary edge
-
-**Layout rules:**
-- Place the core aggregate (the one most other aggregates reference) in the centre
-- Arrange supporting aggregates around it
-- Domain services float between the aggregates they connect
-- External services are on the perimeter, never inside the bounded context box
-- No layer bands — this is a domain model diagram, not an architecture layer diagram
-
-**Render as an interactive HTML widget** (written to `docs/{service}-ddd-architecture.html`), using SVG with:
-- Clean flat styling (no gradients)
-- Colour by aggregate: each aggregate gets a distinct tint (blue, green, amber, purple, teal…)
-- Value objects in a lighter shade of their parent aggregate's colour
-- Domain events as thin directional arrows with labels
-
-### 3f. Output: DDD target design document (`docs/{service}-ddd-target[-{context}].html`)
-
-Write a clean, forward-looking domain design document. **No before/after comparisons, violation lists, or references to current code.** Pure target design.
-
-Apply depth according to the `--depth` flag. Each level includes everything from the level below it.
-
----
-
-**Depth 1 (default)** — aggregate overview
-
-| Section | Content |
-|---------|---------|
-| Bounded context | Core domain statement · Owns / Depends on / Publishes / Consumes |
-| Aggregate roots | Name + identity · Lifecycle states · Invariants (plain statements) · Commands → domain events · Value object pill list |
-| Domain services | Name + which aggregates it coordinates |
-| Domain event routing | Event → Kafka topic / BG service / internal queue |
-
----
-
-**Depth 2** — design detail (adds to depth 1)
-
-| Section | Additional content |
-|---------|-------------------|
-| Aggregate roots | **Child entities** — name, identity, mutable operations, parent aggregate · **Value objects** — each with field names and types · **Domain exceptions** — typed exception for each invariant violation (`{Name}Exception : ContentManagerException`) |
-| Domain services | Full cross-aggregate rule statement · Which invariant it enforces that no single aggregate can enforce alone |
-| Application use cases | One entry per API endpoint: `Actor · Guard (permission) · Guard (invariant) · Load · Mutate · Persist · Dispatch · Publish · Return` |
-
----
-
-**Depth 3** — implementation handoff (adds to depth 2, feeds directly into plan + execute)
-
-| Section | Additional content |
-|---------|-------------------|
-| Value objects | Validation rules: what makes each value object invalid · Factory method signature |
-| Aggregate roots | Repository interface signature (`I{Name}Repository`) with method names and return types · Factory method signature (`{Name}Entity.Create(...)`) |
-| Domain services | Full interface signature (`I{Name}DomainService`) with method names, parameters, return types |
-| Infrastructure map | Per aggregate: exact provider method signatures needed (`CMS.Create{Name}Async(entity)`) · Kafka topic names · Internal queue types (`Channel<{T}>`) · DB table names and key columns |
-| Application use cases | Full method signature: `Task<{Name}Entity> {Operation}Async({params})` · DI dependencies the app service needs injected |
-
-At depth 3, the output is sufficient for `/seismic-engineering:plan` to generate the implementation plan without additional questions.
-
----
-
-Do not include: current code snippets, "before" states, violation severity levels, or gap analysis — those belong in R-Step 6.
-
----
-
-## R-Step 4 — Clarifying questions (scope only)
-
-Ask at most **2 questions** to bound the refactor scope. One at a time.
-
-Good questions:
-- "Should this refactor cover the full service or a specific domain area (e.g. Announcement, Post, Channel)?"
-- "Is breaking API compatibility acceptable, or must the public interface stay unchanged?"
-- "Are there known areas the team already wants to improve?"
-
-Skip if scope is clear from inputs.
-
----
-
-## R-Step 5 — Synthesize refactoring intent
-
-From the domain map and DDD target design, state the **refactoring intent** in one paragraph:
-- What business capability is being improved or clarified?
-- What is the delta between the current code and the DDD target?
-- What outcome defines success (observable, not implementation-level)?
-
----
-
-## R-Step 6 — DDD Gap Analysis
-
-Consume the `domain-refactor-analyzer` output. Produce a gap analysis table with severity:
-
-| Severity | Meaning |
-|----------|---------|
-| 🔴 P0 | Fundamental DDD violation — business rules unprotected, domain logic leaking across layers |
-| 🟡 P1 | Structural weakness — correct behavior but wrong place, hard to extend or test |
-| 🟢 P2 | Improvement — better alignment with DDD, lower cognitive load |
-
-### Gap categories to assess:
-
-**Anemic domain model**
-- Entities that are pure data bags (no invariant-enforcing methods)
-- Business logic in AppService that belongs in the aggregate
-- State transitions managed outside the aggregate (`if status == X` in AppService)
-
-**Layer violations**
-- Domain layer calling infrastructure directly (missing interface)
-- AppService containing domain rules instead of orchestration only
-- Controllers doing orchestration beyond request/response mapping
-- Providers containing business logic
-
-**Missing domain concepts**
-- Value objects represented as primitives (e.g. raw `string` for Email, Status, TenantId)
-- Significant state changes with no domain event raised
-- Cross-aggregate invariants enforced in the wrong place
-- Bounded context bleeding (aggregate reaching into another aggregate's data)
-
-**Infrastructure coupling**
-- Domain entities exposing persistence concerns (ORM annotations on domain objects)
-- Hard dependencies on concrete provider implementations (not interfaces)
-- SEB consumers doing domain logic instead of delegating to domain service
-
-**Exception handling**
-- Raw exceptions thrown from domain layer (not `DomainException(DomainExceptionType.X)`)
-- HTTP status codes decided in domain layer instead of via `DomainExceptionType` mapping
-
----
-
-## R-Step 7 — Produce before/after design
-
-For each P0 and P1 violation, produce a concrete before/after:
-
-```markdown
-### [Violation title] — 🔴 P0
-
-**Current (violation):**
-// AnnouncementAppService.cs — business logic in wrong layer
-if (announcement.Status == "published")
-    throw new Exception("Already published");
-announcement.Status = "archived";
-await _provider.UpdateAsync(announcement);
-
-**Target (DDD-correct):**
-// AnnouncementEntity.cs — invariant enforced by aggregate
-public void Archive()
-{
-    if (Status == AnnouncementStatus.Archived)
-        throw new DomainException(DomainExceptionType.AnnouncementAlreadyArchived,
-            "Announcement is already archived.");
-    Status = AnnouncementStatus.Archived;
-}
-
-// AnnouncementAppService.cs — orchestration only
-announcement.Archive();
-await _provider.UpdateAsync(announcement);
-
-**Files affected:**
-- Move: `AnnouncementAppService.cs` lines 45–52 → `AnnouncementEntity.cs`
-- Add: `DomainExceptionType.AnnouncementAlreadyArchived`
-- Modify: `AnnouncementAppService.ArchiveAsync()` — remove logic, call entity method
-```
-
-Produce before/after for every P0 and P1. List P2s as a table without full before/after.
-
----
-
-## R-Step 8 — Produce target architecture diagram
-
-Show the target DDD-correct architecture using the same Mermaid layer structure as Mode 1. Highlight what is **moving** or **being added** vs what stays the same.
-
-Output as HTML file and attempt to open in browser (see output instructions below).
-
----
-
-## R-Step 9 — Write DDD target HTML, open in browser, ask for confirmation
-
-### 9a. Write the DDD target design as a self-contained HTML file
-
-Write `docs/{service-name}-ddd-target.html` containing:
-- **Bounded context** — owns / depends on / publishes / consumes
-- **Aggregate roots** — one card per aggregate with invariants, commands, and domain events
-- **Value objects** — table showing what each replaces and what validation it adds
-- **Domain events → infrastructure map** — table showing routing (Kafka, BG service, internal)
-- **Before/after code snippets** — one per P0 violation, actual code from the repo (not invented)
-- **Gap analysis table** — all violations with severity, file, category
-- **Confirmation section** — styled option cards (A / B / C / D) at the bottom of the page
-
-### 9b. Open both files in the browser automatically
-
-```bash
-# Open domain map (already generated in R-Step 2)
-# Try to open — works in Cowork/macOS desktop; silently skips in headless CLI
-open "docs/{service-name}-domain-map.html" 2>/dev/null || \
-  xdg-open "docs/{service-name}-domain-map.html" 2>/dev/null || true
-# Always print the path so the engineer can open it manually
-echo "📄 Domain map: $(pwd)/docs/{service-name}-domain-map.html"
-sleep 1
-# Open DDD target design
-open "docs/{service-name}-ddd-target.html" 2>/dev/null || \
-  xdg-open "docs/{service-name}-ddd-target.html" 2>/dev/null || true
-echo "📄 DDD target: $(pwd)/docs/{service-name}-ddd-target.html"
-```
-
-### 9c. Ask for confirmation in chat
-
-After opening both files, present the summary and ask:
-
-> "✅ Both files are open in your browser:
-> - `{service-name}-domain-map.html` — current domains and workflows
-> - `{service-name}-ddd-target.html` — DDD target design with gap analysis
->
-> **Summary:**
-> - 🔴 {N} P0 violations (fundamental — unprotected invariants, wrong layer)
-> - 🟡 {N} P1 violations (structural — testability, duplication)
-> - 🟢 {N} P2 improvements
-> - Estimated: {N} files changed · Risk: [low | medium | high]
->
-> How would you like to proceed?
-> - **A — Full refactor** (P0 + P1 + P2) → generate implementation plan
-> - **B — P0 only** → fix fundamental violations first
-> - **C — One aggregate** → pick the safest starting point
-> - **D — Revise the design** → describe what to change"
-
-**Do not write any implementation files or generate the plan until the engineer responds.**
-If the engineer selects D, update the HTML, re-open it, and re-ask.
-
----
-
-## R-Step 10 — Write the Refactor Design Document (after confirmation)
-
-Based on the engineer's selection, write `docs/domain-refactor-{area}.md`:
-
-```markdown
-# DDD Refactor Design: {Area Name}
-
-_Generated by /seismic-engineering:domain-compose --refactor — input to /seismic-engineering:plan_
-
-## Refactoring Intent
-...
-
-## Scope
-Severity levels included: [P0 | P0+P1 | P0+P1+P2]
-Estimated: {N} files changed, {N} new files
-
-## DDD Gap Report
-
-| # | Violation | File(s) | Severity | Category |
-|---|-----------|---------|----------|----------|
-| 1 | ... | ... | 🔴 P0 | Anemic domain model |
-| 2 | ... | ... | 🟡 P1 | Layer violation |
-
-## Before / After
-
-### [Violation 1] — 🔴 P0
-**Current:** ...
-**Target:** ...
-**Files affected:** ...
-
-[repeat for each included violation]
-
-## Target Architecture
-[Mermaid diagram]
-
-## New / Modified Domain Exceptions
-| DomainExceptionType | HTTP | Replaces |
-|---------------------|------|---------|
-
-## Infrastructure changes
-[only if refactor touches SEB, DB, or providers]
-
-## Observable truths (post-refactor)
-What must be TRUE for this refactor to be complete — without changing external behavior:
-- [ ] All business invariants are enforced inside aggregate methods
-- [ ] AppService methods contain only orchestration (load → validate → mutate → persist → dispatch)
-- [ ] No `DomainException` thrown outside the domain layer
-- [ ] All state transitions go through aggregate command methods
-- [ ] [feature-specific truths]
-```
-
----
-
-## R-Step 11 — Hand off to plan
-
-Output:
-
-> "✅ Refactor design written to `docs/domain-refactor-{area}.md`.
->
-> **Next:** Run `/seismic-engineering:plan docs/domain-refactor-{area}.md`
->
-> **Important for plan:** This is a refactor — plan must:
-> - [ ] Preserve all existing public API contracts (route paths, request/response shapes)
-> - [ ] Order tasks so tests pass after each individual change (no big-bang refactor)
-> - [ ] Flag any DB schema changes that require a migration
-> - [ ] Flag any interface changes that require DI registration updates"
-
----
-
----
-
-# Shadow paths (both modes)
-
-- **No input provided** → ask: "Are you designing a new domain feature or refactoring an existing area? Provide a Jira ticket, Confluence page, repo, or description."
-- **Jira / Atlassian MCP unavailable** → continue with ambient context; note ticket data is unavailable.
-- **Repo not accessible** → ask for the repo path; if still unavailable, flag all structural assumptions under `## Assumptions` in the output doc.
-- **Scope too large** (> 3 aggregate roots for design; > 10 violations for refactor) → emit `### SPLIT RECOMMENDED`, propose sub-scope boundaries, wait for engineer to confirm before writing.
-- **Requirement is purely UI with no domain objects** → skip domain-compose, go directly to `/seismic-engineering:plan`.
-- **Engineer selects "No, revise the design"** in R-Step 6 → take the revision instruction, update the gap report and before/after, and re-present for confirmation. Do not write the file until confirmed.
-
----
-
-# channel-service naming conventions
-
-Applied in both modes — `plan` and `execute` will use these names verbatim.
-
-| Concept | Pattern | Example |
-|---------|---------|---------|
-| Aggregate root | `{Name}Entity` | `AnnouncementEntity` |
-| Domain service | `{Name}Service` / `I{Name}Service` | `AnnouncementService` |
-| App service | `{Name}AppService` / `I{Name}AppService` | `AnnouncementAppService` |
-| External provider | `{Ext}ServiceProvider` / `I{Ext}ServiceProvider` | `CMSServiceProvider` |
-| Postgres jobs | `{Name}DomainJobs` / `I{Name}DomainJobs` | `AnnouncementDomainJobs` |
-| SEB consumer | `{Name}EventConsumer : BackgroundService` | `AnnouncementEventConsumer` |
-| Internal queue | `{Name}EventQueue` / `{Name}NotificationConsumer` | `AnnouncementNotificationQueue` |
-| API controller | `{Name}Controller` | `AnnouncementController` |
-| API model | `{Name}Resource` | `AnnouncementResource` |
-| API mapper | `Mapper{Name}` | `MapperAnnouncement` |
+## Shadow paths
+
+- **No input** → ask: "Are you designing a new domain or refactoring an existing repo?"
+- **Jira/Confluence unavailable** → continue with ambient context, note data is missing
+- **Repo inaccessible** → ask for path; if unavailable, flag all structural assumptions
+- **domain-analysis reports issues** → stop, report exact violations, do not proceed to DDD design

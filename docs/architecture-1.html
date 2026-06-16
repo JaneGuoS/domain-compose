@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DomainCompose — Architecture</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e8eaf0;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:32px}
+  .card{background:#fff;border-radius:20px;box-shadow:0 12px 60px rgba(0,0,0,.14);overflow:hidden;max-width:1200px;width:100%}
+  svg{display:block;width:100%;height:auto}
+</style>
+</head>
+<body>
+<div class="card">
+<svg viewBox="0 0 1100 720" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,sans-serif">
+<defs>
+  <marker id="ag" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#94a3b8"/></marker>
+  <marker id="agr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#16a34a"/></marker>
+  <filter id="sh" x="-6%" y="-20%" width="112%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.08"/></filter>
+  <filter id="sh2" x="-4%" y="-20%" width="108%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000" flood-opacity="0.06"/></filter>
+</defs>
+
+<rect width="1100" height="720" fill="#f0f2f8"/>
+
+<!-- HEADER -->
+<rect x="0" y="0" width="1100" height="54" fill="#FE5000"/>
+<text x="26" y="23" font-size="18" font-weight="800" fill="white" letter-spacing="-0.4">DomainCompose</text>
+<text x="26" y="42" font-size="10" fill="rgba(255,255,255,0.82)">Claude Plugin · Multi-Agent DDD Refactoring Pipeline · Seismic Engineering · Build-A-Thon 2025</text>
+<rect x="864" y="12" width="44" height="14" rx="3" fill="rgba(255,255,255,0.22)"/><text x="886" y="22.5" text-anchor="middle" font-size="7.5" font-weight="700" fill="white">SKILL</text>
+<text x="912" y="22.5" font-size="7.5" fill="rgba(255,255,255,0.72)">focused capability</text>
+<rect x="864" y="30" width="48" height="14" rx="3" stroke="rgba(255,255,255,0.5)" stroke-width="1" stroke-dasharray="4,2" fill="rgba(255,255,255,0.1)"/><text x="888" y="40.5" text-anchor="middle" font-size="7.5" font-weight="700" fill="white">AGENT</text>
+<text x="916" y="40.5" font-size="7.5" fill="rgba(255,255,255,0.72)">composed workflow</text>
+
+<!-- LEFT PANEL -->
+<rect x="10" y="63" width="516" height="598" rx="14" fill="white" stroke="#2563eb" stroke-width="2" filter="url(#sh)"/>
+<rect x="10" y="63" width="516" height="56" rx="14" fill="#dbeafe"/>
+<rect x="10" y="95" width="516" height="24" fill="#dbeafe"/>
+<circle cx="46" cy="90" r="20" fill="#2563eb"/>
+<text x="46" y="95" text-anchor="middle" font-size="15" font-weight="800" fill="white">①</text>
+<text x="76" y="85" font-size="14" font-weight="800" fill="#1e3a8a">Current DDD Map</text>
+<text x="76" y="103" font-size="10" fill="#3b82f6">Understand your existing domain · classify health · define boundaries</text>
+
+<!-- GitHub input -->
+<rect x="26" y="130" width="120" height="50" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.3"/>
+<text x="86" y="150" text-anchor="middle" font-size="8.5" font-weight="700" fill="#334155">GitHub / Local</text>
+<text x="86" y="163" text-anchor="middle" font-size="8" fill="#64748b">Repository</text>
+<text x="86" y="175" text-anchor="middle" font-size="7" fill="#94a3b8">service codebase</text>
+<line x1="146" y1="155" x2="168" y2="155" stroke="#94a3b8" stroke-width="1.3" marker-end="url(#ag)"/>
+
+<!-- domain-analysis -->
+<rect x="170" y="130" width="340" height="50" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.4"/>
+<rect x="180" y="140" width="40" height="12" rx="3" fill="#2563eb"/><text x="200" y="149.5" text-anchor="middle" font-size="7" font-weight="800" fill="white">SKILL</text>
+<text x="230" y="149" font-size="10" font-weight="700" fill="#1e3a8a">domain-analysis</text>
+<text x="230" y="163" font-size="7.5" fill="#3b82f6">100% codebase coverage · one aggregate per domain · discovers relationships</text>
+<rect x="340" y="139" width="160" height="14" rx="3" fill="#fefce8" stroke="#f59e0b" stroke-width="0.9" filter="url(#sh2)"/><text x="346" y="149" font-size="7.5" fill="#92400e" font-weight="600">→ domain-map.json</text>
+<line x1="280" y1="180" x2="280" y2="200" stroke="#64748b" stroke-width="1.3" marker-end="url(#ag)"/>
+
+<!-- Agent 1 -->
+<rect x="18" y="202" width="492" height="218" rx="11" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="8,4"/>
+<text x="36" y="218" font-size="8" font-weight="700" fill="#15803d">AGENT: domain-boundary-context-generation</text>
+<text x="36" y="230" font-size="7" fill="#86efac">manages confirmation gates · returns CONFIRMED_MINING + CONFIRMED_CONTEXTS</text>
+<rect x="30" y="238" width="468" height="46" rx="7" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+<rect x="40" y="247" width="40" height="12" rx="3" fill="#2563eb"/><text x="60" y="256.5" text-anchor="middle" font-size="7" font-weight="800" fill="white">SKILL</text>
+<text x="92" y="256" font-size="10" font-weight="700" fill="#1e3a8a">domain-mining</text>
+<text x="92" y="269" font-size="7.5" fill="#3b82f6">✅ Rich / 🟡 Partial / 🔴 Anemic health · VO candidates · missing events · misplaced rules</text>
+<rect x="368" y="248" width="120" height="13" rx="3" fill="#fefce8" stroke="#f59e0b" stroke-width="0.8"/><text x="374" y="258" font-size="7" fill="#92400e" font-weight="600">→ CONFIRMED_MINING</text>
+<line x1="30" y1="298" x2="498" y2="298" stroke="#16a34a" stroke-width="0.9" stroke-dasharray="3,3"/>
+<rect x="118" y="291" width="210" height="15" rx="5" fill="#dcfce7" stroke="#16a34a" stroke-width="1"/>
+<text x="223" y="302" text-anchor="middle" font-size="8.5" fill="#15803d" font-weight="700">✅  Engineer confirms mining results</text>
+<rect x="30" y="312" width="468" height="46" rx="7" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+<rect x="40" y="321" width="40" height="12" rx="3" fill="#2563eb"/><text x="60" y="330.5" text-anchor="middle" font-size="7" font-weight="800" fill="white">SKILL</text>
+<text x="92" y="330" font-size="10" font-weight="700" fill="#1e3a8a">bounded-context</text>
+<text x="92" y="343" font-size="7.5" fill="#3b82f6">Groups by DB / Kafka / HTTP cohesion · ASCII context map · context relationships</text>
+<rect x="368" y="322" width="120" height="13" rx="3" fill="#fefce8" stroke="#f59e0b" stroke-width="0.8"/><text x="374" y="332" font-size="7" fill="#92400e" font-weight="600">→ CONFIRMED_CONTEXTS</text>
+<line x1="30" y1="372" x2="498" y2="372" stroke="#16a34a" stroke-width="0.9" stroke-dasharray="3,3"/>
+<rect x="108" y="365" width="222" height="15" rx="5" fill="#dcfce7" stroke="#16a34a" stroke-width="1"/>
+<text x="219" y="376" text-anchor="middle" font-size="8.5" fill="#15803d" font-weight="700">✅  Engineer confirms bounded contexts</text>
+<line x1="280" y1="420" x2="280" y2="438" stroke="#64748b" stroke-width="1.3" marker-end="url(#ag)"/>
+
+<!-- impact-analysis -->
+<rect x="26" y="440" width="480" height="46" rx="7" fill="#eff6ff" stroke="#2563eb" stroke-width="1.4"/>
+<rect x="36" y="449" width="40" height="12" rx="3" fill="#2563eb"/><text x="56" y="458.5" text-anchor="middle" font-size="7" font-weight="800" fill="white">SKILL</text>
+<text x="88" y="458" font-size="10" font-weight="700" fill="#1e3a8a">impact-analysis</text>
+<rect x="170" y="449" width="52" height="12" rx="3" fill="#fef3c7" stroke="#f59e0b" stroke-width="0.8"/><text x="196" y="458.5" text-anchor="middle" font-size="7.5" fill="#92400e">--impact</text>
+<text x="232" y="458" font-size="10" fill="#3b82f6"> flag</text>
+<text x="88" y="471" font-size="7.5" fill="#3b82f6">Classifies each domain as direct / indirect / no impact for a given requirement or Jira ticket</text>
+
+<!-- Left Studio preview -->
+<rect x="26" y="504" width="480" height="144" rx="10" fill="#faf5ff" stroke="#a855f7" stroke-width="1.3"/>
+<rect x="26" y="504" width="480" height="26" rx="10" fill="#e9d5ff"/>
+<rect x="26" y="516" width="480" height="14" fill="#e9d5ff"/>
+<text x="266" y="520" text-anchor="middle" font-size="9" font-weight="800" fill="#581c87">DomainCompose Studio  —  views this phase enables</text>
+<line x1="36" y1="532" x2="496" y2="532" stroke="#d8b4fe" stroke-width="1"/>
+<text x="46" y="549" font-size="9" fill="#6d28d9">📋  Domain Overview</text>
+<text x="200" y="549" font-size="7.5" fill="#94a3b8">36 domains · health badges · workflow map · integrations</text>
+<text x="46" y="567" font-size="9" fill="#6d28d9">⚡  Gap Analysis</text>
+<text x="200" y="567" font-size="7.5" fill="#94a3b8">P0 / P1 / P2 violations from workflow step annotations</text>
+<text x="46" y="585" font-size="9" fill="#6d28d9">🗂  Aggregate health map</text>
+<text x="200" y="585" font-size="7.5" fill="#94a3b8">rich / partial / anemic classification per domain</text>
+<text x="46" y="603" font-size="9" fill="#6d28d9">🔍  Impact highlight</text>
+<text x="200" y="603" font-size="7.5" fill="#94a3b8">coloured overlay per domain when --impact runs</text>
+<text x="46" y="621" font-size="9" fill="#6d28d9">⚙  Requirement analysis</text>
+<text x="200" y="621" font-size="7.5" fill="#94a3b8">direct · indirect · none classification per aggregate</text>
+
+<!-- CONNECTION -->
+<rect x="524" y="340" width="52" height="76" rx="6" fill="#f0f2f8"/>
+<text x="550" y="368" text-anchor="middle" font-size="7.5" font-weight="700" fill="#15803d">CONFIRMED</text>
+<text x="550" y="380" text-anchor="middle" font-size="7.5" font-weight="700" fill="#15803d">MODEL</text>
+<text x="550" y="392" text-anchor="middle" font-size="9">✅</text>
+<line x1="526" y1="380" x2="574" y2="380" stroke="#16a34a" stroke-width="2" marker-end="url(#agr)"/>
+
+<!-- RIGHT PANEL -->
+<rect x="574" y="63" width="516" height="598" rx="14" fill="white" stroke="#f59e0b" stroke-width="2" filter="url(#sh)"/>
+<rect x="574" y="63" width="516" height="56" rx="14" fill="#fef3c7"/>
+<rect x="574" y="95" width="516" height="24" fill="#fef3c7"/>
+<circle cx="610" cy="90" r="20" fill="#f59e0b"/>
+<text x="610" y="95" text-anchor="middle" font-size="15" font-weight="800" fill="white">②</text>
+<text x="640" y="85" font-size="14" font-weight="800" fill="#78350f">DDD Target Generation</text>
+<text x="640" y="103" font-size="10" fill="#b45309">Challenge the model · verify relationships · generate target design &amp; gap report</text>
+
+<!-- CONFIRMED_MODEL input -->
+<rect x="590" y="130" width="480" height="30" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.3"/>
+<text x="830" y="149" text-anchor="middle" font-size="9" fill="#15803d" font-weight="700">⬅  CONFIRMED_MODEL — engineer-approved domain model from ①</text>
+
+<!-- ddd-critic -->
+<rect x="590" y="172" width="480" height="52" rx="8" fill="#fdf4ff" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="8,4"/>
+<rect x="600" y="182" width="48" height="12" rx="3" fill="#7c3aed"/><text x="624" y="191.5" text-anchor="middle" font-size="7" font-weight="800" fill="white">AGENT</text>
+<text x="660" y="191" font-size="10" font-weight="700" fill="#581c87">ddd-critic</text>
+<text x="660" y="205" font-size="7.5" fill="#7c3aed">5 DDD lenses: technical/domain boundary · naming · aggregate sizing · missing concepts · coupling risks</text>
+<rect x="908" y="182" width="152" height="13" rx="3" fill="#fdf4ff" stroke="#7c3aed" stroke-width="0.8"/><text x="914" y="192" font-size="7.5" fill="#581c87" font-weight="600">→ numbered findings</text>
+<line x1="590" y1="238" x2="1070" y2="238" stroke="#7c3aed" stroke-width="0.9" stroke-dasharray="3,3"/>
+<rect x="696" y="231" width="248" height="15" rx="5" fill="#fdf4ff" stroke="#7c3aed" stroke-width="1"/>
+<text x="820" y="242" text-anchor="middle" font-size="8.5" fill="#6d28d9" font-weight="700">Engineer accepts / selects findings to apply</text>
+<line x1="830" y1="246" x2="830" y2="262" stroke="#64748b" stroke-width="1.3" marker-end="url(#ag)"/>
+
+<!-- Agent 2: draw-ddd-context-diagram -->
+<rect x="582" y="264" width="492" height="208" rx="11" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="8,4"/>
+<text x="600" y="280" font-size="8" font-weight="700" fill="#c2410c">AGENT: draw-ddd-context-diagram</text>
+<text x="600" y="292" font-size="7" fill="#fdba74">runs relationship-analysis first (code-verified arrows), then ddd-target</text>
+<rect x="594" y="300" width="468" height="48" rx="7" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+<rect x="604" y="309" width="40" height="12" rx="3" fill="#2563eb"/><text x="624" y="318.5" text-anchor="middle" font-size="7" font-weight="800" fill="white">SKILL</text>
+<text x="656" y="318" font-size="10" font-weight="700" fill="#1e3a8a">relationship-analysis</text>
+<text x="656" y="331" font-size="7.5" fill="#3b82f6">Scans real code: FK references · HTTP provider calls · Kafka event pub/sub · shared value objects</text>
+<rect x="932" y="310" width="120" height="13" rx="3" fill="#fefce8" stroke="#f59e0b" stroke-width="0.8"/><text x="938" y="320" font-size="7" fill="#92400e" font-weight="600">→ RELATIONSHIP_MAP</text>
+<rect x="594" y="364" width="468" height="48" rx="7" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+<rect x="604" y="373" width="40" height="12" rx="3" fill="#2563eb"/><text x="624" y="382.5" text-anchor="middle" font-size="7" font-weight="800" fill="white">SKILL</text>
+<text x="656" y="382" font-size="10" font-weight="700" fill="#1e3a8a">ddd-target</text>
+<text x="656" y="395" font-size="7.5" fill="#3b82f6">Composes CONFIRMED_MINING + CONFIRMED_CONTEXTS + RELATIONSHIP_MAP → aggregate cards per context</text>
+<rect x="946" y="374" width="106" height="13" rx="3" fill="#fefce8" stroke="#f59e0b" stroke-width="0.8"/><text x="952" y="384" font-size="7" fill="#92400e" font-weight="600">→ HTML + plan doc</text>
+<line x1="830" y1="472" x2="830" y2="490" stroke="#64748b" stroke-width="1.3" marker-end="url(#ag)"/>
+
+<!-- Output files -->
+<rect x="590" y="492" width="228" height="22" rx="6" fill="#fefce8" stroke="#f59e0b" stroke-width="1.1" filter="url(#sh2)"/>
+<text x="704" y="506" text-anchor="middle" font-size="8.5" fill="#92400e" font-weight="600">🗺  context-map.html</text>
+<rect x="826" y="492" width="228" height="22" rx="6" fill="#fefce8" stroke="#f59e0b" stroke-width="1.1" filter="url(#sh2)"/>
+<text x="940" y="506" text-anchor="middle" font-size="8.5" fill="#92400e" font-weight="600">🎯  ddd-target.html</text>
+<rect x="590" y="522" width="228" height="22" rx="6" fill="#fefce8" stroke="#f59e0b" stroke-width="1.1" filter="url(#sh2)"/>
+<text x="704" y="536" text-anchor="middle" font-size="8.5" fill="#92400e" font-weight="600">📄  domain-refactor.md</text>
+<rect x="826" y="522" width="228" height="22" rx="7" fill="#0f172a" filter="url(#sh2)"/>
+<text x="940" y="537" text-anchor="middle" font-size="10" font-weight="800" fill="white">→  /plan</text>
+
+<!-- Right Studio preview -->
+<rect x="590" y="558" width="480" height="90" rx="10" fill="#faf5ff" stroke="#a855f7" stroke-width="1.3"/>
+<rect x="590" y="558" width="480" height="24" rx="10" fill="#e9d5ff"/>
+<rect x="590" y="568" width="480" height="14" fill="#e9d5ff"/>
+<text x="830" y="573" text-anchor="middle" font-size="9" font-weight="800" fill="#581c87">DomainCompose Studio  —  views this phase generates</text>
+<line x1="600" y1="584" x2="1060" y2="584" stroke="#d8b4fe" stroke-width="1"/>
+<text x="610" y="601" font-size="9" fill="#6d28d9">🎯  Confirmed Domain Model</text>
+<text x="780" y="601" font-size="7.5" fill="#94a3b8">context-grouped aggregate cards · health badges · editable inline</text>
+<text x="610" y="619" font-size="9" fill="#6d28d9">🗺  Bounded Context Diagram</text>
+<text x="780" y="619" font-size="7.5" fill="#94a3b8">SVG context map with code-verified relationship arrows</text>
+<text x="610" y="637" font-size="9" fill="#6d28d9">✏  Generate &amp; Refine</text>
+<text x="780" y="637" font-size="7.5" fill="#94a3b8">edit aggregate cards → regenerate context diagram → export to /plan</text>
+
+<!-- FOOTER -->
+<rect x="0" y="670" width="1100" height="50" fill="#0f172a"/>
+<text x="550" y="682" text-anchor="middle" font-size="7.5" font-weight="700" fill="#475569" letter-spacing="1.2">INFRASTRUCTURE</text>
+<text x="120" y="698" text-anchor="middle" font-size="8" fill="#94a3b8">🗂  claude-tools marketplace repo</text>
+<text x="350" y="698" text-anchor="middle" font-size="8" fill="#94a3b8">☁  Cowork  ·  GitHub org sync</text>
+<text x="590" y="698" text-anchor="middle" font-size="8" fill="#94a3b8">⚙  Claude Code  ·  managed settings</text>
+<text x="840" y="698" text-anchor="middle" font-size="8" fill="#94a3b8">🖥  Node / Express  ·  React CDN</text>
+<line x1="228" y1="676" x2="228" y2="712" stroke="#1e293b" stroke-width="1"/>
+<line x1="466" y1="676" x2="466" y2="712" stroke="#1e293b" stroke-width="1"/>
+<line x1="708" y1="676" x2="708" y2="712" stroke="#1e293b" stroke-width="1"/>
+</svg>
+</div>
+</body>
+</html>
