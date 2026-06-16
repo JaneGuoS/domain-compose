@@ -1,60 +1,138 @@
-# DomainCompose Studio
+# DomainCompose
 
-Interactive web app for visualising service domain architecture, exploring DDD target designs, and analysing requirement impact across a Seismic microservice.
+A multi-agent Claude plugin and local web studio for DDD refactoring of Seismic microservices. Point it at a service repo, and it maps every aggregate, classifies health, detects bounded contexts, challenges the model, and generates a refactor plan — all with engineer confirmation gates at each stage.
 
 ---
 
-## Architecture
+## Pipeline overview
+
+DomainCompose runs in two sequential phases, each gated by engineer review.
+
+```
+① CURRENT DDD MAP
+   domain-analysis          — full controller/app-service scan → domain-map.json
+         ↓
+   domain-boundary-context-generation  (AGENT)
+     ├── domain-mining       — Rich/Partial/Anemic, VOs, missing events, misplaced rules
+     │       ↓  [confirm]
+     └── bounded-context     — DB/Kafka/HTTP cohesion groups, ASCII context map
+             ↓  [confirm]
+   impact-analysis           — optional: classify domains per requirement
+
+② DDD TARGET GENERATION
+   ddd-critic               (AGENT)  — 5-lens adversarial review of the confirmed model
+         ↓  [engineer accepts findings]
+   draw-ddd-context-diagram (AGENT)
+     ├── relationship-analysis  — code-verified inter-aggregate arrows
+     └── ddd-target             — aggregate model per context → HTML + plan doc
+```
+
+---
+
+## Skills
+
+| Skill | Invoked by | What it does |
+|-------|-----------|-------------|
+| `domain-analysis` | engineer | Scans every controller and app service. One aggregate per domain. Outputs `docs/<service>-domain-map.json`. |
+| `domain-mining` | `domain-boundary-context-generation` agent | Deep enrichment: Rich/Partial/Anemic health, value object candidates, missing domain events, misplaced business rules. |
+| `bounded-context` | `domain-boundary-context-generation` agent | Groups aggregates by shared DB tables, providers, and Kafka topics. Produces ASCII context map and upstream/downstream graph. |
+| `relationship-analysis` | `draw-ddd-context-diagram` agent | Reads real code — FK refs, HTTP provider calls, Kafka pub/sub — to build a verified `RELATIONSHIP_MAP`. |
+| `ddd-target` | `draw-ddd-context-diagram` agent | Composes `CONFIRMED_MINING + CONFIRMED_CONTEXTS + RELATIONSHIP_MAP` into a per-context aggregate model. Never reads raw `domain-map.json`. |
+| `impact-analysis` | engineer | Classifies each domain as direct/indirect/none for a given requirement. Uses the relationship graph to propagate transitively. |
+
+## Agents
+
+| Agent | Role |
+|-------|------|
+| `domain-boundary-context-generation` | Orchestrates `domain-mining` then `bounded-context`. Maintains context across both. Manages two confirmation gates. Returns `CONFIRMED_MINING + CONFIRMED_CONTEXTS`. |
+| `ddd-critic` | Adversarial review across 5 lenses: technical boundary confusion, naming anti-patterns, aggregate sizing, missing domain concepts, coupling risks. Numbers every finding so the engineer can accept/reject individually. |
+| `draw-ddd-context-diagram` | Runs `relationship-analysis` first (code-verified arrows), then `ddd-target`. Produces `context-map.html`, `ddd-target.html`, and `domain-refactor-<area>.md`. |
+
+---
+
+## Repository structure
 
 ```
 domain-compose/
+├── skill/
+│   ├── domain-analysis/SKILL.md
+│   ├── domain-mining/SKILL.md
+│   ├── bounded-context/SKILL.md
+│   ├── relationship-analysis/SKILL.md
+│   ├── ddd-target/SKILL.md
+│   ├── impact-analysis/SKILL.md
+│   └── references/
+│       └── ddd-patterns.md
+│
+├── agents/
+│   ├── domain-boundary-context-generation.md
+│   ├── ddd-critic.md
+│   └── draw-ddd-context-diagram.md
+│
 ├── frontend/
-│   ├── index.html          ← The entire running app (single-file, CDN React, no build needed)
-│   └── src/                ← Work-in-progress Vite/React migration (not used by the server yet)
-│       ├── components/
-│       │   ├── AnalyzePanel.tsx
-│       │   ├── DomainGrid.tsx
-│       │   ├── ImpactBar.tsx
-│       │   ├── IntegrationPanel.tsx
-│       │   └── WorkflowPanel.tsx
-│       └── App.tsx
+│   └── index.html              ← Studio UI (single-file CDN React, no build needed)
 │
 ├── backend/
-│   ├── server.js           ← Express server (port 3001) — serves frontend + REST API
-│   ├── data/               ← Pre-analysed service JSON files (one per service)
-│   │   ├── content-manager-service.json
-│   │   ├── channel.json
-│   │   └── repo.json
+│   ├── server.js               ← Express (port 3001) — serves UI + REST API
+│   ├── data/                   ← Pre-analysed service JSON files
 │   └── scripts/
-│       ├── claude-analyze.js   ← Two-phase Claude analysis pipeline (Phase 1: deep analysis, Phase 2: normalise to schema)
+│       ├── claude-analyze.js   ← Two-phase Claude analysis runner
 │       ├── analyze-service.js  ← Local directory analysis runner
 │       └── discover-service.js ← Service catalog discovery runner
 │
-└── skill/
-    └── SKILL.md            ← domain-compose Claude skill definition (used by the analysis pipeline)
+└── docs/
+    ├── architecture.html       ← Pipeline architecture diagram
+    └── <service>-*.html        ← Generated domain map + DDD target outputs
 ```
 
-### How analysis works
+---
 
-Clicking **+ Analyze repo** triggers a two-phase pipeline:
+## DomainCompose Studio
+
+A local web UI for navigating analysis results. Start the backend and open `http://localhost:3001`.
+
+### Views
+
+**Domain Map** — Domain cards showing health status (Rich ✅ / Partial 🟡 / Anemic 🔴), lifecycle, operations, and integrations. Type a requirement in the search bar to highlight impacted domains via `impact-analysis`.
+
+**DDD Target** — Confirmed domain model from the pipeline. Shows a mining summary strip (health counts + bounded context count), aggregate cards grouped by bounded context, and the SVG context map. The "Service Integration Contracts" panel at the bottom shows what the service owns, its external dependencies, and the events it publishes and consumes.
+
+**Gap Analysis** — DDD violations table (P0 / P1 / P2) with file-level detail and before/after code examples.
+
+### Running locally
+
+Prerequisites: Node.js 18+, `claude` CLI authenticated, `gh` CLI authenticated.
+
+```bash
+cd domain-compose/backend
+npm install
+node server.js
+# → http://localhost:3001
+```
+
+### Analysing a new service
+
+Click **+ Analyze repo** in the top-right corner. Accepts a GitHub URL or a local path:
 
 ```
-Input (GitHub URL / local path)
-        ↓
-Phase 1 — claude-analyze.js
-  Claude runs domain-compose --refactor --yes on the repo
-  → Free-form raw findings JSON (domains, workflows, gaps)
-        ↓
-Phase 2 — claude-analyze.js
-  A second constrained Claude call normalises the findings
-  → Exact Studio schema (backend/data/<service>.json)
-        ↓
-Server reloads the service and the UI renders it
+https://github.com/seismic/channel-service
+/path/to/service-repo
 ```
 
-The server polls job status every 800ms via `GET /api/jobs/:id` and streams log lines to the UI while the job runs.
+Analysis takes 10–20 minutes. Progress logs stream live. When complete, the service appears in the dropdown automatically.
 
-### Data schema
+To re-analyse and overwrite existing results:
+
+```bash
+node backend/scripts/claude-analyze.js \
+  --url https://github.com/seismic/<name> \
+  --out <name> \
+  --fresh
+```
+
+---
+
+## Data schema
 
 Each `backend/data/*.json` file follows this shape:
 
@@ -62,7 +140,12 @@ Each `backend/data/*.json` file follows this shape:
 {
   "service": "content-manager-service",
   "analyzedAt": "2026-06-01",
-  "boundedContext": { "owns": [], "dependsOn": [], "publishes": [], "consumes": [] },
+  "boundedContext": {
+    "owns": [],
+    "dependsOn": [],
+    "publishes": [],
+    "consumes": []
+  },
   "domains": [{
     "id": "file",
     "name": "File",
@@ -87,58 +170,6 @@ Each `backend/data/*.json` file follows this shape:
 
 ---
 
-## Running locally
-
-### Prerequisites
-
-- Node.js 18+
-- `claude` CLI installed and authenticated (`claude --version`)
-- `gh` CLI authenticated for analysis from GitHub URLs (`gh auth status`)
-
-### Start the server
-
-```bash
-cd domain-compose/backend
-npm install
-node server.js
-# Opens http://localhost:3001 automatically
-```
-
-The server serves `frontend/index.html` directly — no frontend build step needed.
-
-### Analyse a new service
-
-Click **+ Analyze repo** in the top-right corner. Two input modes:
-
-**GitHub URL** — clones and analyses any accessible repo:
-```
-https://github.com/seismic/channel-service
-```
-
-**Local path** — analyses a repo already on disk:
-```
-/path/to/service-repo
-```
-
-Analysis takes 10–20 minutes. Progress logs stream live in the UI. When complete, the service is added to the dropdown and loaded automatically.
-
-To re-analyse with fresh results (discarding the existing JSON):
-```bash
-node backend/scripts/claude-analyze.js --url https://github.com/seismic/<name> --out <name> --fresh
-```
-
----
-
-## Views
-
-| View | What it shows |
-|------|--------------|
-| **📄 Domain Map** | Domain cards with health status, key workflows, external integrations. Type a requirement in the top bar to highlight impacted domains. |
-| **🔷 DDD Target** | Aggregate context diagram + per-aggregate design (lifecycle, value objects, invariants, commands). Left panel lists aggregate models — click to highlight in the diagram and scroll to the card. |
-| **⚠ Gap Analysis** | DDD violations table (P0/P1/P2) with file-level detail. |
-
----
-
 ## API reference
 
 | Method | Path | Body | Description |
@@ -148,21 +179,5 @@ node backend/scripts/claude-analyze.js --url https://github.com/seismic/<name> -
 | POST | `/api/discover` | `{ url?, alias?, out?, maxDomains? }` | Start analysis from GitHub URL or service alias |
 | POST | `/api/jobs` | `{ dir, out?, maxDomains? }` | Start analysis from local directory path |
 | POST | `/api/analyze-upload` | `{ out?, files: [{path, content}] }` | Start analysis from uploaded file contents |
-| GET | `/api/jobs/:id` | — | Poll job status (`running/done/error`) and log lines |
+| GET | `/api/jobs/:id` | — | Poll job status (`running/done/error`) + log lines |
 | POST | `/api/impact` | `{ service, requirement }` | Impact scores per domain and workflow |
-
----
-
-## Frontend developer notes
-
-The current running app lives entirely in `frontend/index.html` (~75 KB, vanilla JS with CDN React). It is **not** built from `frontend/src/`.
-
-The `frontend/src/` directory is a work-in-progress Vite/React migration. To complete the migration:
-
-1. Port components from `frontend/index.html` into `frontend/src/components/`
-2. Run `npm install` and `npm run dev` in `frontend/` for hot-reload dev (proxies `/api` to port 3001)
-3. When ready to ship, run `npm run build` — this outputs to `frontend/dist/`
-4. Update `backend/server.js` line 10: change `FRONTEND_DIR` to `path.join(__dirname, '..', 'frontend', 'dist')`
-5. Restart the server
-
-Until migration is complete, edit `frontend/index.html` directly and restart the backend to see changes.
