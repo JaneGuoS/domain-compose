@@ -78,33 +78,78 @@ function deleteEdit(service, domainId) {
 }
 
 /**
+ * Deep-merge `overlay` onto `base`.
+ * - Nested plain objects are merged recursively (base fields not in overlay survive).
+ * - Arrays and primitives: overlay wins outright.
+ */
+function deepMerge(base, overlay) {
+  if (!overlay || typeof overlay !== 'object' || Array.isArray(overlay)) {
+    return overlay !== undefined ? overlay : base;
+  }
+  const result = { ...(base || {}) };
+  for (const [k, v] of Object.entries(overlay)) {
+    if (v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v)) {
+      result[k] = deepMerge(result[k], v);
+    } else {
+      result[k] = v;
+    }
+  }
+  return result;
+}
+
+/**
  * Merge SQLite edits into the given domains array:
- *  - Domains in JSON:      use patch from SQLite if present (shallow merge patch wins)
+ *  - Domains in JSON:      deep-merge stored patch on top of fresh analysis data
  *  - Domains deleted:      omit from result
  *  - Domains only in DB:   append to result (user-added domains)
+ *
+ * Fallback matching: if a domain's ID changed after re-analysis but the name
+ * is the same, the stored edit is applied by name so user edits survive
+ * regeneration even when the analyser picks a different slug.
  */
 function applyEdits(service, domains) {
   const edits = getEdits(service);
   if (edits.size === 0) return domains;
 
   const jsonIds = new Set(domains.map(d => d.id));
-  const result  = [];
+
+  // Name → edit lookup for fallback matching when IDs drift between re-analyses
+  const editsByName = new Map();
+  for (const [domainId, edit] of edits) {
+    if (!edit.deleted && edit.data?.name) {
+      editsByName.set(edit.data.name.toLowerCase(), { domainId, edit });
+    }
+  }
+
+  const mergedEditIds = new Set();
+  const result = [];
 
   for (const domain of domains) {
-    const edit = edits.get(domain.id);
+    let edit = edits.get(domain.id);
+
+    // Fallback: match by name when the stored edit's original ID is no longer
+    // in the new JSON (the analyser assigned a different slug).
+    if (!edit && domain.name) {
+      const nameMatch = editsByName.get(domain.name.toLowerCase());
+      if (nameMatch && !jsonIds.has(nameMatch.domainId)) {
+        edit = nameMatch.edit;
+        mergedEditIds.add(nameMatch.domainId);
+      }
+    }
+
     if (!edit) {
-      // Not touched — use as-is
       result.push(domain);
     } else if (!edit.deleted) {
-      // Patch wins for every key present in the stored patch
-      result.push({ ...domain, ...edit.data });
+      // Deep merge: fresh analysis base + user overrides on top
+      result.push(deepMerge(domain, edit.data));
+      mergedEditIds.add(domain.id);
     }
     // deleted → skip
   }
 
   // Append user-added domains (exist in SQLite but not in the JSON file)
   for (const [domainId, edit] of edits) {
-    if (!edit.deleted && !jsonIds.has(domainId)) {
+    if (!edit.deleted && !jsonIds.has(domainId) && !mergedEditIds.has(domainId)) {
       result.push(edit.data);
     }
   }
