@@ -259,9 +259,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 /* INLINE DOMAIN CARD EDIT */
 .dc.dc-editing{border-color:#6366F1;box-shadow:0 0 0 3px rgba(99,102,241,.15);background:#FAFAFE;cursor:default;overflow-x:hidden;overflow-y:auto;height:auto;max-height:80vh;grid-column:span 2;align-self:start}
 .dce-hdr{display:flex;align-items:center;gap:6px;margin-bottom:10px}
-.dce-icon-inp{width:36px;text-align:center;font-size:15px;border:1.5px solid #E5E7EB;border-radius:6px;padding:4px;background:#fff}
-.dce-name-inp{flex:1;font-size:13px;font-weight:700;border:1.5px solid #E5E7EB;border-radius:6px;padding:5px 8px;background:#fff;color:#1E1B3C}
-.dce-icon-inp:focus,.dce-name-inp:focus{outline:none;border-color:#6366F1}
+.dce-name-lbl{flex:1;font-size:13px;font-weight:700;color:#1E1B3C;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dce-field{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;flex:1;min-width:0}
 .dce-lbl{font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;display:block}
 .dce-hint{font-size:9px;font-weight:400;color:#9CA3AF;text-transform:none}
@@ -579,37 +577,18 @@ function DomainGrid({domains,impact,selected,onSelect,onEdit,onAdd}){
 
 // ── DOMAIN CARD INLINE EDIT ───────────────────────────
 function DomainCardInlineEdit({domain,onSave,onDelete,onCancel}){
-  const toLines=arr=>(arr||[]).join('\n');
   const fromLines=s=>s.split('\n').map(l=>l.trim()).filter(Boolean);
-  const t=domain.dddTarget||{};
-  const[f,setF]=useState({
-    name:domain.name,icon:domain.icon,health:domain.health,
-    ops:toLines(domain.operations),
-    aggregate:t.aggregate||'',identity:t.identity||'',
-    lifecycle:toLines(t.lifecycle),valueObjects:toLines(t.valueObjects),
-    childEntities:toLines(t.childEntities),invariants:toLines(t.invariants),
-    commands:t.commands?[...t.commands]:[]
-  });
+  const[f,setF]=useState({health:domain.health,ops:(domain.operations||[]).join('\n')});
   const[confirmDel,setConfirmDel]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const addCmd=()=>setF(p=>({...p,commands:[...p.commands,{cmd:'',event:''}]}));
-  const updCmd=(i,k,v)=>setF(p=>{const c=[...p.commands];c[i]={...c[i],[k]:v};return{...p,commands:c};});
-  const rmCmd=i=>setF(p=>({...p,commands:p.commands.filter((_,j)=>j!==i)}));
   const submit=e=>{
     e.preventDefault();
-    if(!f.name.trim())return;
-    onSave({id:domain.id,name:f.name.trim(),icon:f.icon.trim()||'📦',health:f.health,
-      operations:fromLines(f.ops),
-      dddTarget:{aggregate:f.aggregate.trim()||undefined,identity:f.identity.trim()||undefined,
-        lifecycle:fromLines(f.lifecycle),valueObjects:fromLines(f.valueObjects),
-        childEntities:fromLines(f.childEntities),invariants:fromLines(f.invariants),
-        commands:f.commands.filter(c=>c.cmd.trim())}});
+    onSave({id:domain.id,health:f.health,operations:fromLines(f.ops)});
   };
   return h('div',{className:'dc dc-editing'},
     h('form',{onSubmit:submit},
       h('div',{className:'dce-hdr'},
-        h('input',{className:'dce-icon-inp',value:f.icon,onChange:e=>set('icon',e.target.value),maxLength:4,title:'Icon'}),
-        h('input',{className:'dce-name-inp',value:f.name,onChange:e=>set('name',e.target.value),required:true,placeholder:'Domain name'}),
+        h('span',{className:'dce-name-lbl'},domain.icon,' ',domain.name),
         h('button',{type:'button',className:'dce-btn-cancel',title:'Cancel',onClick:onCancel},'✕')
       ),
       h('div',{className:'dce-field'},
@@ -624,45 +603,6 @@ function DomainCardInlineEdit({domain,onSave,onDelete,onCancel}){
         h('span',{className:'dce-lbl'},'Operations ',h('span',{className:'dce-hint'},'(one per line)')),
         h('textarea',{className:'dce-ta',rows:3,value:f.ops,onChange:e=>set('ops',e.target.value),placeholder:'CreateFile\nUpdateFile'})
       ),
-      h('div',{className:'dce-sec-title'},'DDD Target'),
-      h('div',{className:'dce-row'},
-        h('div',{className:'dce-field'},
-          h('span',{className:'dce-lbl'},'Aggregate Root'),
-          h('input',{className:'dce-inp',value:f.aggregate,onChange:e=>set('aggregate',e.target.value),placeholder:'e.g. FileEntity'})
-        ),
-        h('div',{className:'dce-field'},
-          h('span',{className:'dce-lbl'},'Identity'),
-          h('input',{className:'dce-inp',value:f.identity,onChange:e=>set('identity',e.target.value),placeholder:'e.g. Id (GUID)'})
-        )
-      ),
-      h('div',{className:'dce-field'},
-        h('span',{className:'dce-lbl'},'Lifecycle States ',h('span',{className:'dce-hint'},'(one per line)')),
-        h('textarea',{className:'dce-ta dce-ta-sm',rows:3,value:f.lifecycle,onChange:e=>set('lifecycle',e.target.value),placeholder:'draft\nprocessing\nready'})
-      ),
-      h('div',{className:'dce-row'},
-        h('div',{className:'dce-field'},
-          h('span',{className:'dce-lbl'},'Value Objects ',h('span',{className:'dce-hint'},'(one per line)')),
-          h('textarea',{className:'dce-ta dce-ta-sm',rows:3,value:f.valueObjects,onChange:e=>set('valueObjects',e.target.value),placeholder:'FileStatus\nCheckoutState'})
-        ),
-        h('div',{className:'dce-field'},
-          h('span',{className:'dce-lbl'},'Child Entities ',h('span',{className:'dce-hint'},'(one per line)')),
-          h('textarea',{className:'dce-ta dce-ta-sm',rows:3,value:f.childEntities,onChange:e=>set('childEntities',e.target.value),placeholder:'FileVersionEntity'})
-        )
-      ),
-      h('div',{className:'dce-field'},
-        h('span',{className:'dce-lbl'},'Invariants ',h('span',{className:'dce-hint'},'(one per line)')),
-        h('textarea',{className:'dce-ta',rows:3,value:f.invariants,onChange:e=>set('invariants',e.target.value),placeholder:'A file cannot be deleted while checked out'})
-      ),
-      h('div',{className:'dce-field'},
-        h('span',{className:'dce-lbl'},'Commands'),
-        f.commands.map((c,i)=>h('div',{key:i,className:'dce-cmd-row'},
-          h('input',{className:'dce-inp dce-inp-cmd',value:c.cmd,onChange:e=>updCmd(i,'cmd',e.target.value),placeholder:'Checkout(actorId)'}),
-          h('span',{className:'dce-cmd-arrow'},'→'),
-          h('input',{className:'dce-inp dce-inp-cmd',value:c.event,onChange:e=>updCmd(i,'event',e.target.value),placeholder:'FileCheckedOut'}),
-          h('button',{type:'button',className:'dce-cmd-rm',onClick:()=>rmCmd(i)},'✕')
-        )),
-        h('button',{type:'button',className:'dce-add-cmd',onClick:addCmd},'+ Add command')
-      ),
       h('div',{className:'dce-ftr'},
         !confirmDel
           ?h('button',{type:'button',className:'dce-btn dce-btn-dg',onClick:()=>setConfirmDel(true)},'Remove domain')
@@ -673,7 +613,7 @@ function DomainCardInlineEdit({domain,onSave,onDelete,onCancel}){
             ),
         h('div',{className:'dce-ftr-r'},
           h('button',{type:'button',className:'dce-btn dce-ghost',onClick:onCancel},'Cancel'),
-          h('button',{type:'submit',className:'dce-btn dce-primary'},'Save changes')
+          h('button',{type:'submit',className:'dce-btn dce-primary'},'Save')
         )
       )
     )
