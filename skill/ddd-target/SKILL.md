@@ -1,72 +1,79 @@
 ---
 name: ddd-target
-argument-hint: "<service-name | path-to-domain-map.json> [--depth <1|2|3>] [--domain <name>] [--yes]"
-description: "Takes a verified domain map JSON (output of domain-analysis) and produces a DDD target design: aggregate context diagram, per-aggregate model cards, gap analysis, and a refactor plan doc. Relationships between aggregates are derived from the domain map's relationships array — never from workflow sequences."
+argument-hint: "<service-name> [--depth <1|2|3>] [--domain <name>] [--yes]"
+description: "Generates the DDD target design per bounded context. Composes output from the domain-boundary-context-generation agent (CONFIRMED_MINING + CONFIRMED_CONTEXTS) and the relationship-analysis skill (RELATIONSHIP_MAP). Never reads raw domain-map.json directly — all inputs come from upstream pipeline stages."
 ---
 
-## Input
+## Inputs
 
-Requires a verified `docs/<service>-domain-map.json` produced by the `domain-analysis` skill.
-The `relationships` array in that JSON is the authoritative source for inter-aggregate connections.
+This skill is called **after** the following pipeline stages have already completed:
 
-If the file doesn't exist, run `domain-analysis` first.
+| Input | Source | Contains |
+|-------|--------|---------|
+| `CONFIRMED_MINING` | `domain-mining` skill (confirmed by engineer) | Per-domain health classification (`good`/`partial`/`anemic`), VO candidates, missing events, misplaced rules |
+| `CONFIRMED_CONTEXTS` | `bounded-context` skill (confirmed by engineer) | Bounded context groupings, which aggregates belong to which context, ASCII context map |
+| `RELATIONSHIP_MAP` | `relationship-analysis` skill | Classified inter-aggregate relationships: pattern, mechanism, ACL flag, confidence |
 
----
-
-## Relationship types and their diagram representation
-
-The `relationships` array uses these types. Each maps to a specific arrow style in the aggregate context diagram:
-
-| Type | Meaning | Arrow style |
-|------|---------|-------------|
-| `child-of` | This aggregate has a mandatory FK to another aggregate's root. The child cannot exist without the parent. | Filled diamond (composition) ◆── |
-| `references` | This aggregate stores an optional FK to another aggregate. Looser coupling than child-of. | Open arrow ──► |
-| `guarded-by` | This aggregate's commands call a permission/policy aggregate before mutating state. | Dashed arrow - - ► labelled "checks" |
-| `coordinates` | An app service or domain service orchestrates both aggregates together. | Double-headed arrow ◄──► labelled "coordinates" |
-| `notifies` | This aggregate raises a domain event that another aggregate consumes. | Orange arrow ──► labelled with event name |
-| `depends-on` | This aggregate reads data from another aggregate's read model or provider. | Grey dashed arrow - - ► labelled "reads" |
-
-**Critical rule**: Relationships come ONLY from the `relationships` array. Never infer relationships from workflow step sequences — workflows describe runtime orchestration, not domain model structure.
+If any of these are missing, halt and instruct the engineer to run the upstream stage first:
+- Missing `CONFIRMED_MINING` / `CONFIRMED_CONTEXTS` → run `domain-boundary-context-generation` agent
+- Missing `RELATIONSHIP_MAP` → run `relationship-analysis` skill
 
 ---
 
-## Step 1 — Define bounded context
+## Step 1 — Reconstruct bounded context structure
 
-From the domain map `boundedContext` field, state:
-- **Core domain**: the primary business capability (what this service uniquely owns)
-- **Supporting domains**: areas that support core but could be separated
-- **Context boundary**: what this service owns vs. what external services own
+From `CONFIRMED_CONTEXTS`, build the context inventory:
+
+```
+Context: Content Authoring
+  Aggregates: FileEntity, FolderModel, ContentVersionModel, ApprovalModel, ...
+  Owns: core authoring lifecycle (create, version, approve, expire)
+  Depends on: Workspace & Identity (access guard)
+
+Context: Publishing
+  Aggregates: PublishingModel, ChannelModel, ...
+  Owns: content delivery to channels
+  Upstream: Content Authoring (Kafka: content-event)
+...
+```
+
+State the **core domain** (most central context), **supporting domains**, and **context boundary** — what this service owns vs. what external services own.
 
 ---
 
-## Step 2 — Design aggregate model for each domain
+## Step 2 — Design the aggregate model for each domain
 
-For each domain in the map, using the domain's `aggregate`, `relationships`, and `operations`:
+For each domain in `CONFIRMED_MINING`, using its `health`, `aggregate`, `valueObjects`, `missingEvents`, and `misplacedRules`:
 
 ```
 Aggregate: {aggregate.name}
+  Context:    {assigned context from CONFIRMED_CONTEXTS}
+  Health:     {good ✅ Rich | partial 🟡 | anemic 🔴} — from CONFIRMED_MINING
   Identity:   {aggregate.identity}
-  Lifecycle:  {aggregate.lifecycle[]} — transitions are business rules, not just state flags
-  
-  Invariants (derived from health assessment and operations, not from current code):
+  Lifecycle:  {aggregate.lifecycle[]} — transitions are business rules, not state flags
+
+  Invariants (derived from health assessment):
     - "{Aggregate} cannot [verb] unless [condition]"
-    - One invariant per lifecycle transition gate
-    - One invariant per uniqueness or integrity constraint visible in operations
-  
+    - One per lifecycle gate surfaced in CONFIRMED_MINING
+    - One per uniqueness/integrity constraint
+
   Commands (one per state-mutating operation):
     - {Verb}{Name}({actorId}, {RequestType}) → raises {Name}{Verb}ed
-  
-  Value objects (from aggregate.valueObjects[]):
+
+  Value objects (from CONFIRMED_MINING.valueObjects[]):
     - {Name}: immutable, identity by value, validated on construction
-  
-  Child entities (from aggregate.childEntities[]):
-    - {Name}: has identity, belongs to exactly this aggregate, not shared
-  
-  Relationships (from domain map relationships[] where from == this domain):
-    - {type} → {target domain}: {description}
+
+  Missing events flagged by mining:
+    - {event description} — add RaiseDomainEvent call to {method}
+
+  Misplaced rules flagged by mining:
+    - {rule} currently in AppService → move to {Aggregate}.{method}()
+
+  Relationships (from RELATIONSHIP_MAP where this aggregate appears):
+    - {pattern} → {target aggregate}: {mechanism} [ACL? confidence]
 ```
 
-**Do not add relationships that are not in the domain map `relationships` array.** If a relationship is missing from the domain map, note it as a gap rather than inventing it.
+**Do not invent relationships not present in RELATIONSHIP_MAP.** If a relationship was not verified by `relationship-analysis`, note it as `? unverified`.
 
 ---
 
@@ -74,9 +81,9 @@ Aggregate: {aggregate.name}
 
 A domain service is needed when a business rule spans two or more aggregates and cannot belong to either one.
 
-For each cross-aggregate invariant in the gap analysis, decide:
-- Can the rule be enforced by one aggregate checking the other via its interface? → no service needed, use `references` relationship
-- Does the rule require coordinating state changes in two aggregates atomically? → domain service needed
+For each cross-aggregate rule in `CONFIRMED_MINING.misplacedRules`:
+- Can the rule be enforced by one aggregate checking the other? → no service needed, use `references` relationship
+- Does the rule require coordinating state changes atomically? → domain service needed
 
 Name pattern: `{Concept}DomainService` / `I{Concept}DomainService`
 
@@ -84,19 +91,27 @@ Name pattern: `{Concept}DomainService` / `I{Concept}DomainService`
 
 ## Step 4 — Draw the aggregate context diagram
 
-**Source of truth for arrows**: the `relationships` array only. No workflow-derived arrows.
+**Source of truth for arrows**: `RELATIONSHIP_MAP` only. Draw only High and Medium confidence relationships as solid/dashed arrows; mark Low confidence as `? unverified` with grey dotted style.
+
+### Arrow styles by pattern (from RELATIONSHIP_MAP)
+
+| Pattern | Arrow |
+|---------|-------|
+| Upstream → Downstream | Solid ──► labelled `uses` |
+| Anti-Corruption Layer | Solid ──► labelled `ACL ▼` (amber) |
+| Conformist | Solid ──► labelled `conforms` |
+| Async Event | Dashed ──► labelled with Kafka topic name (green) |
+| Shared Kernel | Double-headed ◄──► (purple) |
+| Co-workflow risk | Dotted ··► `? coupling` (grey) |
 
 ### Layout
 
-- Place the **core aggregate** (most incoming `references`/`child-of` relationships) in the centre
-- Arrange aggregates that reference the core in a ring around it
-- Aggregates with no relationships to others go on the periphery
+- Place the **core aggregate** (most incoming relationships in RELATIONSHIP_MAP) in the centre
+- Arrange aggregates referencing the core in a ring around it
 - Domain services float between the aggregates they connect
-- External systems (HTTP providers, Kafka) go outside the bounded context boundary
+- External systems (from RELATIONSHIP_MAP mechanisms labelled HTTP/Kafka) go outside the bounded context boundary
 
 ### Box contents (per aggregate)
-
-Each aggregate box is a UML-style class box with three compartments:
 
 ```
 ┌─────────────────────────────┐
@@ -105,58 +120,37 @@ Each aggregate box is a UML-style class box with three compartments:
 ├─────────────────────────────┤
 │  id: fileId (Guid)          │  ← identity
 │  lifecycle: active→archived │  ← lifecycle states
-│  ◯ FileStatus               │  ← value objects as pills
-│  ◯ ContentType              │
+│  health: ✅ Rich            │  ← from CONFIRMED_MINING
+│  ◯ FileStatus               │  ← value objects (pills)
 ├─────────────────────────────┤
 │  + CreateFile()→FileCreated │  ← commands (top 3)
 │  + Archive()→FileArchived   │
-│  ⚠ 3 invariants             │  ← invariant count
+│  ⚠ 3 invariants             │  ← count from CONFIRMED_MINING
 └─────────────────────────────┘
 ```
 
-Child entities appear as smaller dashed boxes attached below the parent aggregate box.
+Draw a dashed outer rectangle labelled `{service} — {context name} bounded context`.
 
-### Arrows
-
-Draw one arrow per entry in the `relationships` array:
-
-```
-child-of    ◆────────►  (filled diamond at child end, arrow at parent)
-references  ────────►   (open arrowhead)
-guarded-by  - - - - ►  (dashed, labelled "checks")
-coordinates ◄── ──►    (double arrow, labelled with domain service name)
-notifies    ────────►  (orange, labelled with event name)
-depends-on  · · · · ►  (grey dotted, labelled "reads")
-```
-
-Label every arrow with the `field` (if present) or `description` from the relationship entry, truncated to 20 chars.
-
-### External boundary
-
-Draw a dashed outer rectangle labelled "{service} — bounded context".
-
-Outside it, on the right edge:
-- Kafka OUT topics as orange rounded boxes labelled with short topic name
-- Kafka IN topics as blue rounded boxes
-
-Outside it, on the bottom edge:
-- HTTP provider boxes labelled with provider name (from `integrations.http[]`)
+Outside it:
+- Kafka OUT topics (orange boxes) from RELATIONSHIP_MAP Async Event upstream entries
+- Kafka IN topics (blue boxes) from RELATIONSHIP_MAP Async Event downstream entries
+- HTTP provider boxes (from RELATIONSHIP_MAP HTTP mechanism entries)
 
 ---
 
 ## Step 5 — Gap analysis
 
-Assess DDD violations against the target design:
+Using `CONFIRMED_MINING` as the authoritative gap source — do not re-scan code:
 
-| Severity | Category | What to look for |
-|----------|---------|-----------------|
-| 🔴 P0 | Anemic model | Entity has public setters; lifecycle transitions happen outside entity methods; invariants checked in AppService |
-| 🔴 P0 | Layer violation | Domain layer imports infrastructure namespace; AppService constructs domain objects with `new` instead of factory |
-| 🟡 P1 | Missing concept | Status as raw string instead of value object; no domain event raised for state transitions; cross-aggregate FK without a relationship entry |
-| 🟡 P1 | Relationship gap | FK field exists on an entity but no corresponding entry in the `relationships` array |
-| 🟢 P2 | Naming | Entity method named as CRUD (`Update`) instead of intention-revealing (`Publish`, `Archive`) |
+| Severity | Category | Source in CONFIRMED_MINING |
+|----------|---------|--------------------------|
+| 🔴 P0 | Anemic model | domains where health = `anemic` |
+| 🔴 P0 | Layer violation | `misplacedRules` entries |
+| 🟡 P1 | Missing concept | `missingEvents` entries; VO candidates not yet extracted |
+| 🟡 P1 | Relationship gap | RELATIONSHIP_MAP entries marked `? unverified` |
+| 🟢 P2 | Naming | Operations named as CRUD instead of intention-revealing verbs |
 
-For each P0 and P1, produce a before/after using actual class names from the domain map:
+For each P0 and P1, produce a before/after using actual class names:
 
 ```
 ### {Title} — 🔴 P0
@@ -176,21 +170,18 @@ Target (DDD-correct):
   // FileAppService.cs — orchestration only
   file.Archive();
   await _provider.UpdateAsync(file);
-
-Files affected:
-  - Move: FileAppService.cs lines ~45 → FileEntity.cs
-  - Add: DomainExceptionType.FileAlreadyArchived
 ```
 
 ---
 
-## Step 6 — DDD target design document
+## Step 6 — Write the DDD target design document
 
 Write `docs/<service>-ddd-target.html`. Content by depth:
 
 **Depth 1** — aggregate overview
-- Bounded context statement
-- One card per aggregate: identity, lifecycle, invariants (plain English), commands → events, value object pills
+- Bounded context statement (from CONFIRMED_CONTEXTS)
+- Mining summary header: total domains · N rich · N partial · N anemic · N missing events
+- One card per aggregate: identity, lifecycle, health badge, invariants, commands → events, VO pills
 
 **Depth 2** (adds to depth 1)
 - Child entities with fields and mutable operations
@@ -225,25 +216,10 @@ Wait for response. If D, update the design and re-present.
 Write `docs/domain-refactor-<area>.md` including:
 - Refactoring intent (one paragraph)
 - Scope (which severity levels)
-- Gap report table
+- Gap report table (from CONFIRMED_MINING + RELATIONSHIP_MAP)
 - Before/after for every included violation
+- Relationship changes required (ACL insertions, event boundary cleanups from RELATIONSHIP_MAP)
 - Observable truths post-refactor (what must be TRUE, not how to implement it)
 
 Then output:
 > "✅ Run `/seismic-engineering:plan docs/domain-refactor-<area>.md`"
-
----
-
-## Relationship gap detection
-
-After Step 2, scan all aggregate fields for FK patterns not covered by a relationship entry:
-
-```
-For each domain D:
-  For each field in D.aggregate matching pattern *Id, *Key, *Reference:
-    If no relationship entry exists where from==D.id and field==that fieldName:
-      Flag as P1 gap: "Missing relationship: {D.name}.{field} → (unknown target)"
-      Suggest: "Add relationship entry — likely type 'child-of' or 'references'"
-```
-
-This catches the case where domain-analysis missed a relationship.

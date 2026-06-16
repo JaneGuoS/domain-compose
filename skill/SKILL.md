@@ -4,12 +4,24 @@ argument-hint: "[--refactor] [--impact <requirement>] [--yes] [PROJ-123 | github
 description: "Orchestrator skill. Routes to the right sub-skill based on flags: (1) no flags = design a new domain from a requirement; (2) --refactor = run domain-analysis then produce DDD gap report and target design; (3) --impact = run impact-analysis for a requirement. See sub-skills for full detail."
 ---
 
-## Sub-skills
+## Skills (focused capabilities)
 
-| Sub-skill | What it does | When it runs |
-|-----------|-------------|-------------|
-| [`domain-analysis`](domain-analysis/SKILL.md) | Discovers all domains from a codebase, verifies uniqueness + coverage, extracts inter-domain relationships, outputs `docs/<service>-domain-map.json` | Called by `--refactor` before DDD design |
-| [`impact-analysis`](impact-analysis/SKILL.md) | Given a requirement + domain map, classifies each domain and workflow as direct/indirect/none using the relationships graph | Called by `--impact` |
+| Skill | What it does |
+|-------|-------------|
+| [`domain-analysis`](domain-analysis/SKILL.md) | Discovers domains from a codebase, verifies uniqueness + coverage, extracts inter-domain relationships → `docs/<service>-domain-map.json` |
+| [`domain-mining`](domain-mining/SKILL.md) | Enriches a domain map: rich/anemic classification, value object candidates, missing events, misplaced business rules |
+| [`bounded-context`](bounded-context/SKILL.md) | Groups aggregates into bounded contexts by DB/provider/Kafka cohesion, produces ASCII context map with relationship types |
+| [`relationship-analysis`](relationship-analysis/SKILL.md) | Scans real code (FKs, HTTP calls, Kafka flows, shared VOs) to find and classify actual inter-aggregate relationships. Always called before diagram generation to ensure arrows are correct |
+| [`ddd-target`](ddd-target/SKILL.md) | Generates the HTML DDD target design per bounded context, using verified relationship data for correct event arrows |
+| [`impact-analysis`](impact-analysis/SKILL.md) | Given a requirement, classifies each domain as direct/indirect/none impact |
+
+## Agents (composed workflows with memory)
+
+| Agent | Composes | What it does |
+|-------|---------|-------------|
+| [`domain-boundary-context-generation`](../agents/domain-boundary-context-generation.md) | domain-mining + bounded-context | Orchestrates both skills sequentially, holds context across them, manages engineer confirmation gates, returns a confirmed domain model + context boundaries |
+| [`ddd-critic`](../agents/ddd-critic.md) | — | Challenges the confirmed model across 5 lenses: technical vs domain boundaries, naming, aggregate sizing, missing concepts, relationship risks. Numbered findings for selective acceptance |
+| [`draw-ddd-context-diagram`](../agents/draw-ddd-context-diagram.md) | relationship-analysis + ddd-target | Runs `relationship-analysis` first (verified relationships from code), then `ddd-target` (per-context HTML), then generates the context map SVG using only code-verified relationship arrows |
 
 ---
 
@@ -30,9 +42,21 @@ description: "Orchestrator skill. Routes to the right sub-skill based on flags: 
 ```
 domain-compose <input>
   │
-  ├─ --refactor ──► domain-analysis → DDD gap report → DDD target design → /plan
+  ├─ --refactor ──► domain-analysis (skill)
+  │                      ↓
+  │               domain-boundary-context-generation (agent)
+  │                ├─ domain-mining (skill)         ← [user confirms]
+  │                └─ bounded-context (skill)        ← [user confirms]
+  │                      ↓
+  │               ddd-critic (agent)                 ← [user accepts/rejects]
+  │                      ↓
+  │               draw-ddd-context-diagram (agent)
+  │                ├─ relationship-analysis (skill)  ← verifies inter-aggregate links from code
+  │                ├─ ddd-target (skill)             ← per-context aggregate model HTML
+  │                └─ context-map.html (generated using verified relationships)
+  │                      ↓ → /plan
   │
-  ├─ --impact   ──► impact-analysis → annotated HTML map
+  ├─ --impact   ──► impact-analysis (skill) → annotated HTML map
   │
   └─ (none)     ──► Design mode (below)
 ```
@@ -43,7 +67,7 @@ domain-compose <input>
 
 **Step 1 — Run domain-analysis**
 
-Invoke `domain-analysis` on the input repo. Wait for the verified `docs/<service>-domain-map.json` before proceeding.
+Invoke `domain-analysis` on the input repo. Wait for the verified `docs/<service>-domain-map.json`.
 
 The domain-analysis skill enforces:
 - Unique domain names (no duplicates)
@@ -51,51 +75,121 @@ The domain-analysis skill enforces:
 - One aggregate per domain
 - Explicit inter-domain relationships
 
-Do not proceed to Step 2 if domain-analysis reports coverage < 100% or any duplicate names. Fix the issues first.
+Do not proceed to Step 2 if coverage < 100% or any duplicate names. Fix issues first.
 
-**Step 2 — DDD gap analysis**
+---
 
-Using the verified domain map, assess DDD violations:
+**Step 2 — Domain Boundary & Context Generation** (`domain-boundary-context-generation` agent)
 
-| Severity | Meaning |
-|----------|---------|
-| 🔴 P0 | Fundamental — business rules unprotected, logic in wrong layer |
-| 🟡 P1 | Structural — correct behaviour, wrong place |
-| 🟢 P2 | Improvement — lower cognitive load |
+<!-- Agent dispatch: domain-boundary-context-generation (agents/domain-boundary-context-generation.md) -->
 
-Gap categories:
-- **Anemic model** — entity is a data bag, logic lives in app service
-- **Layer violation** — domain calls infrastructure directly, controller does orchestration
-- **Missing concept** — value objects as primitives, no domain events raised for state changes
-- **Infra coupling** — domain depends on concrete providers, not interfaces
+This agent runs `domain-mining` and `bounded-context` skills in sequence, managing confirmation gates internally. It returns a single confirmed domain model + context boundaries.
 
-For each P0 and P1 produce a before/after code snippet using actual class names from the repo.
+Dispatch `domain-boundary-context-generation` agent with `REPO`, `DOMAIN_MAP_JSON`, and `YES_MODE`. The agent internally:
+1. Runs `domain-mining` skill → presents results → waits for engineer confirmation
+2. Runs `bounded-context` skill with confirmed mining output → presents context map → waits for confirmation
 
-**Step 3 — DDD target design** (`--depth 1|2|3`)
+The agent returns `CONFIRMED_MODEL` (aggregate health + enrichments + context boundaries + ASCII map).
+
+If `--yes` is set: agent skips both confirmation gates automatically.
+
+---
+
+**Step 3 — DDD Critic** (`ddd-critic` agent)
+
+<!-- Agent dispatch: ddd-critic (agents/ddd-critic.md) -->
+
+Dispatch `ddd-critic-agent` with `REPO`, `DOMAIN_MAP_JSON`, confirmed mining output, and confirmed context output. Present in chat:
+
+> **🔍 DDD Critic — Agent 3 complete**
+>
+> **N findings:** ❌ N high · ⚠️ N medium · ℹ️ N low
+>
+> [Finding #1] — TECHNICAL vs DOMAIN BOUNDARY ❌
+> {challenge text}
+>
+> [Finding #2] — NAMING ANTI-PATTERN ⚠️
+> {challenge text}
+>
+> ...
+>
+> **Survives critique:** {list}
+>
+> Which findings do you want to incorporate?
+> - **A — Accept all**
+> - **B — Select** → list numbers (e.g. "1, 3")
+> - **C — Reject all**
+
+Wait for response. If `--yes`: accept all High and Medium findings.
+
+---
+
+**Step 4 — Draw DDD Context Diagram** (`draw-ddd-context-diagram` agent)
+
+<!-- Agent dispatch: draw-ddd-context-diagram (agents/draw-ddd-context-diagram.md) -->
+
+Dispatch `draw-ddd-context-diagram` agent with `CONFIRMED_MODEL`, `SERVICE_NAME`, `REPO`, and `DOCS_DIR`.
+
+The agent produces:
+- `docs/{service}-context-map.html` — SVG showing all bounded contexts and relationships
+- `docs/{service}-ddd-target-{context}.html` per bounded context (or single `ddd-target.html`)
+
+Both files are auto-opened in the browser. The DomainCompose Studio app also reflects the updated model — engineers can edit aggregate fields in-app and regenerate the context diagram from the updated state.
+
+Depth levels (`--depth 1|2|3`) are passed through to the agent.
+
+---
+
+**Step 5 — Confirmation gate**
+
+Present summary. Skip if `--yes`.
+
+---
+
+**Step 6 — DDD target design** (`ddd-target` skill — optional, for written design doc)
+
+Invoke `ddd-target` with the confirmed + critiqued domain map.
+
+If multi-context detected (Step 3):
+- Write `docs/<service>-context-map.html` — SVG context map with all contexts, relationships, ACL markers
+- Write `docs/<service>-ddd-target-<context>.html` per context
+
+If single context:
+- Write `docs/<service>-ddd-target.html`
+
+Depth levels (`--depth 1|2|3`):
 
 | Depth | Includes |
 |-------|---------|
 | 1 | Aggregate roots, value objects, lifecycle, invariants, commands → events |
 | 2 | + Child entities, domain services, exception types, application use cases |
-| 3 | + Value object validation, repository interfaces, factory signatures, exact provider methods, DB tables |
+| 3 | + Value object validation, repository interfaces, factory signatures, DB tables |
 
-Write `docs/<service>-ddd-target.html`.
+Auto-open all generated files in browser.
 
-**Step 4 — Confirmation gate**
+**Step 6 — Confirmation gate**
 
 Present summary:
-> "🔴 N P0  🟡 N P1  🟢 N P2 — estimated N files changed"
+> "**N bounded contexts · N aggregate roots · N VO candidates · N missing events**
 >
-> A — Full refactor (P0+P1+P2) → plan
-> B — P0 only
-> C — One aggregate
-> D — Revise design
+> Critic findings applied: {list accepted}
+>
+> How to proceed?
+> - A — Full refactor (all contexts) → plan
+> - B — One context first → which?
+> - C — Revise the design"
 
 Skip if `--yes`.
 
-**Step 5 — Hand off**
+**Step 7 — Hand off**
 
-Write `docs/domain-refactor-<area>.md` and output:
+Write `docs/domain-refactor-<area>.md` including:
+- Bounded context summary
+- Mining findings incorporated
+- Critic findings accepted
+- Observable truths (what must be true for refactor to be complete)
+
+Output:
 > "✅ Run `/seismic-engineering:plan docs/domain-refactor-<area>.md`"
 
 ---
