@@ -55,6 +55,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .agg-cmds td:last-child{color:#2E7D32;font-weight:600}
 /* aggregate colour themes */
 .agg.t-blue .agg-hdr{background:#E3F2FD;border-bottom:1px solid #BBDEFB;color:#1565C0}
+.agg-hdr.t-blue{background:#E3F2FD;border-bottom:1px solid #BBDEFB;color:#1565C0}
 .agg.t-purple .agg-hdr{background:#F3E5F5;border-bottom:1px solid #E1BEE7;color:#6A1B9A}
 .agg.t-green .agg-hdr{background:#E8F5E9;border-bottom:1px solid #C8E6C9;color:#1B5E20}
 .agg.t-amber .agg-hdr{background:#FFF8E1;border-bottom:1px solid #FFE082;color:#7A5000}
@@ -614,6 +615,78 @@ function DomainCardInlineEdit({domain,onSave,onDelete,onCancel}){
         h('div',{className:'dce-ftr-r'},
           h('button',{type:'button',className:'dce-btn dce-ghost',onClick:onCancel},'Cancel'),
           h('button',{type:'submit',className:'dce-btn dce-primary'},'Save')
+        )
+      )
+    )
+  );
+}
+
+// ── DDD TARGET ADD MODAL ─────────────────────────────
+function DddDomainAddModal({onSave,onClose}){
+  const[f,setF]=useState({id:'',name:'',icon:'📦',aggregate:'',identity:'',lifecycle:[],valueObjects:[],invariants:'',commands:[]});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const submit=e=>{
+    e.preventDefault();
+    if(!f.id.trim()||!f.name.trim()||!f.aggregate.trim())return;
+    onSave({
+      id:f.id.trim().toLowerCase().replace(/[^a-z0-9-]/g,'-'),
+      name:f.name.trim(),
+      icon:f.icon.trim()||'📦',
+      health:'partial',
+      operations:[],
+      dddTarget:{
+        aggregate:f.aggregate.trim(),
+        identity:f.identity.trim(),
+        lifecycle:f.lifecycle,
+        valueObjects:f.valueObjects,
+        invariants:f.invariants.split('\n').map(l=>l.trim()).filter(Boolean),
+        commands:f.commands.filter(c=>c.cmd.trim())
+      }
+    });
+  };
+  return h('div',{className:'dem-ov',onClick:e=>{if(e.target===e.currentTarget)onClose();}},
+    h('div',{style:{width:'100%',maxWidth:540,maxHeight:'90vh',display:'flex',flexDirection:'column',borderRadius:12,overflow:'hidden',boxShadow:'0 8px 32px rgba(0,0,0,.18)'}},
+      h('form',{onSubmit:submit,style:{display:'flex',flexDirection:'column',flex:1,overflow:'hidden'}},
+        h('div',{className:'agg-hdr t-blue',style:{padding:'12px 14px',display:'flex',alignItems:'center',gap:8}},
+          h('input',{style:{background:'transparent',border:'none',outline:'none',fontSize:20,width:30,cursor:'text',padding:0},value:f.icon,onChange:e=>set('icon',e.target.value),maxLength:4,title:'Icon'}),
+          h('input',{style:{background:'transparent',border:'none',outline:'none',fontSize:13,fontWeight:700,flex:1,minWidth:0,color:'inherit'},value:f.aggregate,onChange:e=>set('aggregate',e.target.value),placeholder:'Aggregate Root *',required:true}),
+          f.identity&&h('span',{className:'agg-identity'},`id: ${f.identity}`),
+          h('button',{type:'button',className:'agg-edit-btn',style:{marginLeft:'auto'},onClick:onClose},'✕')
+        ),
+        h('div',{className:'agg-edit-form',style:{overflowY:'auto',flex:1,background:'#fff',padding:'14px'}},
+          h('div',{className:'edit-field'},
+            h('div',{className:'agg-lbl'},'Domain Name *'),
+            h('input',{className:'edit-input',value:f.name,onChange:e=>set('name',e.target.value),placeholder:'Human-readable name',required:true})
+          ),
+          h('div',{className:'edit-field'},
+            h('div',{className:'agg-lbl'},'Domain ID *'),
+            h('input',{className:'edit-input',value:f.id,onChange:e=>set('id',e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'-')),placeholder:'e.g. billing',required:true}),
+            h('div',{style:{fontSize:10,color:'#9AA7B4',marginTop:2}},'Lowercase, hyphens only')
+          ),
+          h('div',{className:'edit-field'},
+            h('div',{className:'agg-lbl'},'Identity Field'),
+            h('input',{className:'edit-input',value:f.identity,onChange:e=>set('identity',e.target.value),placeholder:'e.g. invoiceId'})
+          ),
+          h('div',{className:'edit-field'},
+            h('div',{className:'agg-lbl'},'Lifecycle States'),
+            h(ChipEditor,{chips:f.lifecycle,onChange:v=>set('lifecycle',v)})
+          ),
+          h('div',{className:'edit-field'},
+            h('div',{className:'agg-lbl'},'Value Objects'),
+            h(ChipEditor,{chips:f.valueObjects,onChange:v=>set('valueObjects',v)})
+          ),
+          h('div',{className:'edit-field'},
+            h('div',{className:'agg-lbl'},'Invariants (one per line)'),
+            h('textarea',{className:'edit-textarea',rows:4,value:f.invariants,onChange:e=>set('invariants',e.target.value),placeholder:'Must have at least one line item\nTotal must be positive'})
+          ),
+          h('div',{className:'edit-field'},
+            h('div',{className:'agg-lbl'},'Commands → Events'),
+            h(CommandEditor,{cmds:f.commands,onChange:v=>set('commands',v)})
+          )
+        ),
+        h('div',{className:'edit-btn-row',style:{background:'#fff',borderTop:'1px solid #F0F0F0',padding:'10px 14px'}},
+          h('button',{type:'button',className:'cancel-btn',onClick:onClose},'Cancel'),
+          h('button',{type:'submit',className:'save-btn'},'✓ Add domain')
         )
       )
     )
@@ -1265,14 +1338,14 @@ function ChipEditor({chips,onChange}){
   return h('div',{className:'chip-editor'},
     (chips||[]).map((chip,i)=>h('span',{key:i,className:'chip-editable'},
       chip,
-      h('button',{onClick:()=>onChange((chips||[]).filter((_,j)=>j!==i))},'×')
+      h('button',{type:'button',onClick:()=>onChange((chips||[]).filter((_,j)=>j!==i))},'×')
     )),
     h('div',{className:'chip-add-row'},
       h('input',{className:'chip-input',value:newVal,placeholder:'Add…',
         onChange:e=>setNewVal(e.target.value),
-        onKeyDown:e=>{if(e.key==='Enter'&&newVal.trim()){onChange([...(chips||[]),newVal.trim()]);setNewVal('');}}
+        onKeyDown:e=>{if(e.key==='Enter'&&newVal.trim()){onChange([...(chips||[]),newVal.trim()]);setNewVal('');e.preventDefault();}}
       }),
-      h('button',{className:'chip-add-btn',onClick:()=>{if(newVal.trim()){onChange([...(chips||[]),newVal.trim()]);setNewVal('');}}},'+')
+      h('button',{type:'button',className:'chip-add-btn',onClick:()=>{if(newVal.trim()){onChange([...(chips||[]),newVal.trim()]);setNewVal('');}}},'+')
     )
   );
 }
@@ -1286,9 +1359,9 @@ function CommandEditor({cmds,onChange}){
       h('span',{className:'cmd-arrow'},'→'),
       h('input',{className:'cmd-input',value:c.event||'',placeholder:'EventName',
         onChange:e=>onChange((cmds||[]).map((x,j)=>j===i?{...x,event:e.target.value}:x))}),
-      h('button',{className:'cmd-del',onClick:()=>onChange((cmds||[]).filter((_,j)=>j!==i))},'×')
+      h('button',{type:'button',className:'cmd-del',onClick:()=>onChange((cmds||[]).filter((_,j)=>j!==i))},'×')
     )),
-    h('button',{className:'cmd-add-btn',onClick:()=>onChange([...(cmds||[]),{cmd:'',event:''}])},'+ Add command')
+    h('button',{type:'button',className:'cmd-add-btn',onClick:()=>onChange([...(cmds||[]),{cmd:'',event:''}])},'+ Add command')
   );
 }
 
@@ -1767,6 +1840,7 @@ function App(){
   const[impactLoading,setImpactLoading]=useState(false);
   const[editDomain,setEditDomain]=useState(null); // domain object or null (modal, add only)
   const[isNewDomain,setIsNewDomain]=useState(false);
+  const[isNewDddDomain,setIsNewDddDomain]=useState(false);
   const[editingId,setEditingId]=useState(null); // inline card edit
   const[toasts,setToasts]=useState([]);
 
@@ -1829,6 +1903,18 @@ function App(){
       showToast('❌ Failed to save changes','danger');
     }
     setEditDomain(null);setIsNewDomain(false);
+  };
+
+  const handleSaveDddDomain=async patch=>{
+    if(!activeSvc)return;
+    const r=await fetch(`${API}/api/services/${activeSvc}/domains`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+    if(r.ok){
+      setData(await r.json());
+      showToast(`✅ Domain "${patch.name}" added`);
+    } else {
+      showToast('❌ Failed to save changes','danger');
+    }
+    setIsNewDddDomain(false);
   };
 
   const handleDeleteDomain=async domainId=>{
@@ -2048,7 +2134,11 @@ function App(){
                   domains:g.domains,impact,editedTargets,
                   onEdit:(id,t)=>setEditedTargets(prev=>({...prev,[id]:t}))
                 })
-              ))
+              )),
+              h('button',{key:'__add-ddd',className:'dc dc-add',style:{marginTop:12},onClick:e=>{e.stopPropagation();setIsNewDddDomain(true);}},
+                h('span',{className:'dc-add-icon'},'＋'),
+                h('span',{className:'dc-add-lbl'},'Add Domain')
+              )
             );
           })(),
           // Context diagram (spinner → SVG)
@@ -2086,6 +2176,8 @@ function App(){
     showAnalyze&&h(AnalyzePanel,{onClose:()=>setShowAnalyze(false),onDone:handleAnalyzeDone}),
     // Domain edit/add modal
     isNewDomain&&h(DomainEditModal,{domain:null,isNew:true,onSave:handleSaveDomain,onClose:()=>{setEditDomain(null);setIsNewDomain(false);}}),
+    // DDD Target add modal
+    isNewDddDomain&&h(DddDomainAddModal,{onSave:handleSaveDddDomain,onClose:()=>setIsNewDddDomain(false)}),
     // Toasts
     toasts.length>0&&h('div',{className:'toast-wrap'},
       toasts.map(t=>h('div',{key:t.id,className:`toast toast-${t.type}`},t.msg))
