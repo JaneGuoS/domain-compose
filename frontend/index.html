@@ -1575,12 +1575,23 @@ function App(){
   const[editedTargets,setEditedTargets]=useState({});
   const[ctxMapStatus,setCtxMapStatus]=useState('idle'); // 'idle' | 'generating' | 'ready'
   const[impactLoading,setImpactLoading]=useState(false);
+  const[editDomain,setEditDomain]=useState(null); // domain object or null (modal, add only)
+  const[isNewDomain,setIsNewDomain]=useState(false);
+  const[isNewDddDomain,setIsNewDddDomain]=useState(null);
+  const[editingId,setEditingId]=useState(null); // inline card edit
+  const[toasts,setToasts]=useState([]);
+
+  const showToast=(msg,type='success')=>{
+    const id=Date.now();
+    setToasts(t=>[...t,{id,msg,type}]);
+    setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),3000);
+  };
 
   const loadService=async name=>{
-    setLoading(true);setImpact(null);setSelDomain(null);setSelAgg(null);setSelWf(null);setEditedTargets({});setCtxMapStatus('idle');
+    setActiveSvc(name);
+    setLoading(true);setImpact(null);setSelDomain(null);setSelAgg(null);setSelWf(null);setEditedTargets({});setCtxMapStatus('idle');setEditingId(null);
     const r=await fetch(`${API}/api/analyze/${name}`);
     setData(await r.json());
-    setActiveSvc(name);
     setLoading(false);
   };
 
@@ -1696,7 +1707,7 @@ function App(){
         impact,view
       }),
 
-      h('main',{className:'content'},
+      h('main',{className:'content',key:activeSvc},
         // Domain Map view
         view==='current'&&h('div',null,
           selectedDomain&&h(DomainDetail,{domain:selectedDomain,impact,onClose:()=>setSelDomain(null)}),

@@ -1,0 +1,1416 @@
+{
+  "service": "channel-service",
+  "analyzedAt": "2026-06-18",
+  "boundedContext": {
+    "owns": [
+      "Channel",
+      "Post",
+      "Comment",
+      "Reaction",
+      "Announcement",
+      "SocialStream",
+      "SocialContent",
+      "SocialShare",
+      "AIGeneratedPost",
+      "GenerativeAISettings",
+      "UserSocialProfile"
+    ],
+    "dependsOn": [
+      "UMS — User Management Service",
+      "CMS — Content Management Service (Cms3Manager)",
+      "BSS — Blob Storage Service",
+      "FMS — Feature Management Service (feature toggles)",
+      "DAS — Data Access Service (social compliance config)",
+      "VFS — Video File Storage Service",
+      "CAS — Content Access Service",
+      "SocialSharingService — external social network scheduler",
+      "ProofPoint — social compliance evaluation",
+      "ProofPointNative — native ProofPoint API",
+      "EntitlementService — user role and permission store",
+      "MatrixClient — tenant creation events"
+    ],
+    "publishes": [
+      "channel.content.ingested",
+      "channel.content.updated"
+    ],
+    "consumes": [
+      "ums.user.event",
+      "vfs.content.vfs-processed"
+    ]
+  },
+  "gapAnalysis": [
+    {
+      "id": 1,
+      "title": "CMS is the authoritative persistence layer — channel-service owns no data",
+      "detail": "Every aggregate (Channel, Post, Comment, Announcement, Social*) persists exclusively via CMSServiceProvider HTTP calls. The channel-service domain model cannot enforce cross-aggregate invariants, cannot run atomic transactions, and is entirely unavailable if CMS is down. The domain layer is a pure orchestration shell, not an authoritative store. This is the foundational architectural risk.",
+      "file": "CMSServiceProvider.cs",
+      "severity": "P0",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 2,
+      "title": "Infrastructure proxies exposed as domain controllers",
+      "detail": "DASController/DASAppService, FMSController/FMSAppService, EntitlementController/EntitlementAppService, and BlobStorageController/BSSAppService are pure pass-through proxies with no owned aggregate, no business logic, and no lifecycle. They expose external service APIs directly on the channel-service's API surface, creating tight coupling between API consumers and the internals of downstream services. These should be encapsulated behind internal anti-corruption layer (ACL) adapters and not surfaced as independent controllers.",
+      "file": "DASController.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 3,
+      "title": "Compliance data structures duplicated across Social domains",
+      "detail": "SocialContentEntity and SocialShareEntity both carry full inline compliance response objects (ContentResponse, Violation, Evidence, ContentCategory hierarchies) — identical structures duplicated verbatim across both entities. A Compliance value object should be extracted and shared, or a dedicated Compliance aggregate in the SocialCompliance domain should own this data and expose a reference from the other aggregates.",
+      "file": "SocialContentEntity.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 4,
+      "title": "PostEntity carries denormalized ChannelName",
+      "detail": "PostEntity.ChannelName is a denormalized cross-domain field with an inline TODO comment: 'temporary fix until we can get the channel details from the post' (SP-10102). This violates aggregate boundary rules — Post should never store Channel data. Channel details should be resolved at query time via the Channel domain service rather than embedded in the Post aggregate.",
+      "file": "PostEntity.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 5,
+      "title": "Attachment refill logic duplicated across four aggregates",
+      "detail": "PostEntity, CommentEntity, SocialContentEntity, and SocialShareEntity all implement identical AddAttachment() and Refill() methods (~200 lines) for LibraryContent, ProfileContent, WorkSpaceContent, and PeerToPeerContent. This pattern is copy-pasted four times. It should be extracted into a ContentAttachmentCollection value object or a ContentRefillService domain service to eliminate duplication and centralize invariant enforcement.",
+      "file": "PostEntity.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 6,
+      "title": "UserDetailsEntity parses JObject in domain constructor",
+      "detail": "UserDetailsEntity's constructor accepts a raw JObject and performs JSON deserialization (preferenceDetailsToken.ToObject<UserPreferenceDetailsEntity>()) to populate sub-entities. JSON parsing is an infrastructure concern that must not appear in domain entities. The repository or mapper layer should deserialize the JSON into typed DTOs before passing them to the entity constructor.",
+      "file": "UserDetailsEntity.cs",
+      "severity": "P1",
+      "category": "Infra coupling"
+    },
+    {
+      "id": 7,
+      "title": "Task.Run cache invalidation fired directly in controllers",
+      "detail": "PostController.CreateOrUpdatePostAsync and AnnouncementController.CreateAnnouncementAsync use Task.Run() to trigger cache reloads without awaiting. These fire-and-forget calls will silently fail, are untestable, and bypass the application service contract. Cache invalidation should be expressed as a domain event consumed by a dedicated handler.",
+      "file": "PostController.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 8,
+      "title": "No domain events for this service's own aggregates",
+      "detail": "VideoProcessedEvent exists only for inbound Kafka consumption. The channel-service emits zero domain events for its own state changes (ChannelCreated, PostPublished, CommentCreated, etc.). All cross-domain side-effects (cache, notifications, downstream updates) are wired as direct synchronous calls in AppService or controllers, making the model non-evolvable and tightly coupled.",
+      "file": "ChannelEntity.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 9,
+      "title": "Content Access controllers are proxy anti-pattern",
+      "detail": "ContentController, FMSController, DASController, and BlobStorageController expose external-service APIs through the channel-service API surface without adding any domain logic. This creates implicit coupling: callers treating channel-service as a gateway to CMS/FMS/DAS will break when those contracts change. These should be consolidated into a declared ACL adapter or removed.",
+      "file": "ContentController.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 10,
+      "title": "ProofPoint compliance embedded in SocialContentAppService",
+      "detail": "ProofPoint compliance checks are invoked directly inside SocialContentAppService rather than as a domain policy or Specification. The invariant 'social content must pass compliance before scheduling' is invisible in the domain model and cannot be tested without the HTTP dependency. A CompliancePolicy specification should live in the domain layer.",
+      "file": "SocialContentAppService.cs",
+      "severity": "P1",
+      "category": "Anemic model"
+    },
+    {
+      "id": 11,
+      "title": "No domain events — side effects dispatched directly from AppService",
+      "detail": "CreatePost, CreateChannel, CreateAnnouncement, and CreateComment all produce notifications by calling INotificationEventDispatcher directly from the AppService layer. ContentIngestedEvent and ContentUpdatedEvent are defined in the DataAccess/Infrastructure layers, not in Domain. The domain model has no event sourcing — all business-observable state changes are invisible to other aggregates without cross-service coupling.",
+      "file": "PostAppService.cs",
+      "severity": "P1",
+      "category": "Missing concept"
+    },
+    {
+      "id": 12,
+      "title": "Cross-aggregate compliance orchestration belongs in a domain service",
+      "detail": "SocialComplianceAppService.CheckComplianceAsync orchestrates reads and writes across SocialShare, SocialContent, and UserComplianceDetails aggregates in a single method, then calls ProofPoint and DAS. This business decision logic (is this content compliant? can this user share?) is a domain service responsibility, not an application service responsibility. Moving it preserves invariants without coupling AppServices.",
+      "file": "SocialComplianceAppService.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 13,
+      "title": "UMSEventConsumer bypasses aggregate lifecycle on user deactivation",
+      "detail": "UMSEventConsumer directly calls service/repository methods for channel removal and social share cancellation without going through aggregate state transitions or raising domain events (UserDeactivated). This makes the deactivation side effects invisible to the domain model and untestable as invariants. A UserDeactivatedDomainEvent should trigger the affected aggregates.",
+      "file": "UMSEventConsumer.cs",
+      "severity": "P1",
+      "category": "Layer violation"
+    },
+    {
+      "id": 14,
+      "title": "AnnouncementPostEntity and AnnouncementSetting misnamed as entities",
+      "detail": "AnnouncementPostEntity and AnnouncementSetting are used as value objects within AnnouncementEntity — they are replaced wholesale on update, not mutated in-place, and carry no identity. Their 'Entity' suffix causes DDD naming confusion. They should be renamed to AnnouncementPost and AnnouncementSchedule (value objects) to accurately reflect their role.",
+      "file": "AnnouncementEntity.cs",
+      "severity": "P2",
+      "category": "Anemic model"
+    },
+    {
+      "id": 15,
+      "title": "AIGeneratedPostEntity has no domain behavior",
+      "detail": "AIGeneratedPostEntity is a pure data bag with no business methods, no lifecycle enforcement, and no invariants. All logic lives in AIGeneratedPostAppService which orchestrates external AI service calls. The domain object should at minimum encapsulate status transition rules (Pending → Generated → Failed) and cache invalidation invariants.",
+      "file": "AIGeneratedPostEntity.cs",
+      "severity": "P2",
+      "category": "Anemic model"
+    },
+    {
+      "id": 16,
+      "title": "Missing domain events for successful state transitions",
+      "detail": "ChannelEntity, PostEntity, CommentEntity, and AnnouncementEntity raise DomainException for invariant violations but emit no domain events for successful state transitions (e.g., ChannelRequestCreated, PostPublished, AnnouncementPublished). Domain events are needed to support eventual consistency, audit trails, and decoupled integration with the Notification domain — currently the app service directly calls the notification dispatcher, bypassing the domain event model.",
+      "file": "ChannelEntity.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 17,
+      "title": "Entitlement domain is a pure ACL adapter with no local model",
+      "detail": "EntitlementController and EntitlementAppService are 1:1 pass-throughs to EntitlementServiceProvider. There is no cached role model, no local permission assertion, and no domain concept. This should be an infrastructure adapter (IEntitlementAdapter), not a named domain. Calling it a domain misleads future modelling and inflates the bounded context.",
+      "file": "EntitlementController.cs",
+      "severity": "P2",
+      "category": "Layer violation"
+    },
+    {
+      "id": 18,
+      "title": "SocialStreamEntity conflates channel metadata with stream configuration",
+      "detail": "SocialStreamEntity duplicates all ChannelEntity fields (ChannelId, ChannelType, ThumbnailId, PermissionEntity, RequestEntity, LastUserVisits) alongside stream-specific config (SocialNetworkSettings, ComplianceConfigurations, SearchParameters, RssFeeds, Interests). These are two concerns with separate change rates. The channel-level fields should be a reference (ChannelId FK), not a copy embedded in the stream aggregate.",
+      "file": "SocialStreamEntity.cs",
+      "severity": "P2",
+      "category": "Anemic model"
+    },
+    {
+      "id": 19,
+      "title": "UserAnnouncements acknowledgment produces no observable event",
+      "detail": "UserAnnouncementsService.AcknowledgeAsync is a silent DB write with no domain event. This makes it impossible to trigger downstream effects (e.g. marking an announcement fully acknowledged when all channel members have read it, or surfacing analytics) without polling. An AnnouncementAcknowledged event is the missing concept.",
+      "file": "UserAnnouncementsService.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 20,
+      "title": "NotificationEventDispatcher injected directly into AppServices",
+      "detail": "INotificationEventDispatcher is injected into ChannelAppService, PostAppService, and others. Notification dispatch is an infrastructure side-effect that should be driven by domain events, not called directly in the application layer. This creates a tight coupling between business logic and notification infrastructure and makes AppServices harder to test.",
+      "file": "ChannelAppService.cs",
+      "severity": "P2",
+      "category": "Layer violation"
+    },
+    {
+      "id": 21,
+      "title": "PostEntity.Status is an untyped string",
+      "detail": "PostEntity.Status is declared as string? with values like 'published' and 'draft' hardcoded as string literals across the codebase. This should be a PostStatus enum with a governed transition table inside the aggregate to prevent invalid lifecycle moves and catch errors at compile time.",
+      "file": "PostEntity.cs",
+      "severity": "P2",
+      "category": "Anemic model"
+    },
+    {
+      "id": 22,
+      "title": "Compliance value objects duplicated across Social Content and Social Share",
+      "detail": "ContentResponse, Violation, Evidence, ContentCategory, ContentImage, ExtractedArticle are defined as identical inline mappings in both SocialContentEntity and SocialShareEntity constructors. These should be shared Value Objects in Domain/Common/ValueObjects so compliance data is modelled once and changes propagate consistently.",
+      "file": "SocialContentEntity.cs",
+      "severity": "P2",
+      "category": "Missing concept"
+    },
+    {
+      "id": 23,
+      "title": "EntitlementAppService and FMSAppService are anemic pass-through facades",
+      "detail": "Both services have zero domain logic and delegate 100% to their respective external providers. Introducing a controller+AppService layer for pure proxy concerns adds indirection without DDD value. These should be collapsed into Anti-Corruption Layer adapters injected directly where consumed, or absorbed into the domains that depend on them (Entitlement → Channel; FMS → Social Compliance).",
+      "file": "EntitlementAppService.cs",
+      "severity": "P2",
+      "category": "Anemic model"
+    },
+    {
+      "id": 24,
+      "title": "UserDetailsAppService enforces domain invariants that belong in the aggregate",
+      "detail": "Stream-order deduplication, SocialNetworkPageType enum validation, and NetworkDefaultVisibility parsing all live in UserDetailsAppService.UpsertUserPreferenceDetailsAsync. These are invariants of the UserDetailsEntity aggregate and should be enforced inside it to prevent invalid state regardless of which AppService path is taken.",
+      "file": "UserDetailsAppService.cs",
+      "severity": "P2",
+      "category": "Layer violation"
+    },
+    {
+      "id": 25,
+      "title": "AIGeneratedPostEntity and GenerativeAISettingsEntity marked ExcludeFromCodeCoverage",
+      "detail": "Both AI domain entities carry [ExcludeFromCodeCoverage] attributes, indicating zero test coverage for the Generative AI domain. Combined with the absence of domain invariants in these entities, this domain has no safety net for behavioral regressions — high risk for a feature dependent on external AI service integration.",
+      "file": "AIGeneratedPostEntity.cs",
+      "severity": "P2",
+      "category": "Anemic model"
+    }
+  ],
+  "domains": [
+    {
+      "id": "channel",
+      "name": "Channel",
+      "icon": "🤝",
+      "health": "good",
+      "operations": [
+        "ChannelController: POST /channels, GET /channels, PUT /channels/{id}, DELETE /channels/{id}",
+        "ChannelController: POST /channels/{id}/members, DELETE /channels/{id}/members/{userId}",
+        "ChannelController: POST /channels/{id}/requests, PUT /channels/{id}/requests/{requestId}",
+        "Public/ChannelController: GET /public/channels, GET /public/channels/{id}",
+        "ChannelAppService: CreateChannelAsync, UpdateChannelAsync, GetChannelAsync, GetUserChannelsAsync, AddMemberAsync, RemoveMemberAsync, RequestAccessAsync, ApproveRequestAsync, VisitChannelAsync"
+      ],
+      "keywords": [
+        "channel",
+        "membership",
+        "permission",
+        "join",
+        "request",
+        "public",
+        "private",
+        "visit",
+        "access"
+      ],
+      "dddTarget": {
+        "aggregate": "ChannelEntity",
+        "identity": "ChannelId (Guid.NewGuid string, set in constructor)",
+        "lifecycle": [
+          "PUBLIC",
+          "AUTHORIZEDONLY",
+          "PRIVATE"
+        ],
+        "valueObjects": [
+          "PermissionEntity",
+          "UserVisit",
+          "MemberAccess"
+        ],
+        "childEntities": [
+          "RequestEntity"
+        ],
+        "invariants": [
+          "A user cannot have two pending requests of the same AccessType for the same channel",
+          "A user already holding the requested permission level cannot re-submit a join request",
+          "ChannelType must be PUBLIC or PRIVATE",
+          "Member limit is capped at 200 per PermissionEntity"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(createUserId, channelRequest)",
+            "event": "ChannelCreated"
+          },
+          {
+            "cmd": "UpdatePermission(type, members)",
+            "event": "ChannelPermissionUpdated"
+          },
+          {
+            "cmd": "AddRequest(userId, accessType)",
+            "event": "ChannelJoinRequested"
+          },
+          {
+            "cmd": "RemoveRequest(requestId)",
+            "event": "ChannelRequestRemoved"
+          },
+          {
+            "cmd": "AddOrUpdateUserVisit(userId)",
+            "event": "UserChannelVisitRecorded"
+          },
+          {
+            "cmd": "Delete()",
+            "event": "ChannelDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "post",
+      "name": "Post",
+      "icon": "📄",
+      "health": "partial",
+      "operations": [
+        "PostController: POST /posts, GET /posts, PUT /posts/{id}, DELETE /posts/{id}",
+        "PostController: POST /posts/{id}/feature, DELETE /posts/{id}/feature",
+        "Public/PostController: GET /public/posts/{id}, GET /public/posts",
+        "PostAppService: CreatePostAsync, UpdatePostAsync, GetPostAsync, DeletePostAsync, GetPostsAsync, FeaturePostAsync, UnfeaturePostAsync"
+      ],
+      "keywords": [
+        "post",
+        "shortform",
+        "attachment",
+        "featured",
+        "channel",
+        "body",
+        "draft",
+        "published",
+        "reaction",
+        "reply"
+      ],
+      "dddTarget": {
+        "aggregate": "PostEntity",
+        "identity": "PostId (conditionally set from request or generated externally)",
+        "lifecycle": [
+          "Draft",
+          "Published",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "AttachContentBase",
+          "LibraryContent",
+          "ProfileContent",
+          "WorkSpaceContent",
+          "PeerToPeerContent"
+        ],
+        "childEntities": [
+          "ReactionEntity"
+        ],
+        "invariants": [
+          "Attachment ContentType must be one of LibraryContent, ProfileContent, WorkSpaceContent, PeerToPeerContent",
+          "LibraryContent attachment requires a LibraryContentExtension with TeamSiteId",
+          "ProfileContent attachment requires a ProfileContentExtension with ProfileVersionId",
+          "Attached content must resolve to a valid rendition in the external content store before the post is returned"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(createUser, postRequest)",
+            "event": "PostCreated"
+          },
+          {
+            "cmd": "Update(createUser, postRequest, origPost)",
+            "event": "PostUpdated"
+          },
+          {
+            "cmd": "AddAttachment(attachmentRequest)",
+            "event": "AttachmentAdded"
+          },
+          {
+            "cmd": "Delete()",
+            "event": "PostDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "comment",
+      "name": "Comment & Reaction",
+      "icon": "📦",
+      "health": "good",
+      "operations": [
+        "CommentController: POST /comments, GET /comments/{id}, PUT /comments/{id}, DELETE /comments/{id}",
+        "CommentController: POST /posts/{id}/reactions, DELETE /posts/{id}/reactions/{reactionId}",
+        "CommentAppService: CreateCommentAsync, GetCommentAsync, UpdateCommentAsync, DeleteCommentAsync, AddReactionAsync, RemoveReactionAsync"
+      ],
+      "keywords": [
+        "comment",
+        "reaction",
+        "reply",
+        "mention",
+        "thread",
+        "emoji",
+        "attachment",
+        "parent"
+      ],
+      "dddTarget": {
+        "aggregate": "CommentEntity",
+        "identity": "CommentId (Guid.NewGuid string)",
+        "lifecycle": [
+          "Created",
+          "Edited",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "MentionUser",
+          "AttachContentBase",
+          "LibraryContent",
+          "ProfileContent",
+          "WorkSpaceContent",
+          "PeerToPeerContent"
+        ],
+        "childEntities": [
+          "ReactionEntity"
+        ],
+        "invariants": [
+          "ContentType must be LibraryContent | ProfileContent | WorkSpaceContent | PeerToPeerContent",
+          "LibraryContent requires non-null LibraryContentExtension",
+          "ProfileContent requires non-null ProfileContentExtension"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(createUserId, commentRequest)",
+            "event": "CommentCreated"
+          },
+          {
+            "cmd": "Update(createUser, commentRequest, origComment)",
+            "event": "CommentEdited"
+          },
+          {
+            "cmd": "AddReaction(userId, reactionType)",
+            "event": "ReactionAdded"
+          },
+          {
+            "cmd": "RemoveReaction(userId)",
+            "event": "ReactionRemoved"
+          },
+          {
+            "cmd": "Delete()",
+            "event": "CommentDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "announcement",
+      "name": "Announcement",
+      "icon": "🚀",
+      "health": "good",
+      "operations": [
+        "AnnouncementController: POST /announcements, GET /announcements, GET /announcements/{id}, PUT /announcements/{id}/post, PUT /announcements/{id}/settings, DELETE /announcements/{id}",
+        "AnnouncementAppService: CreateAnnouncementAsync, UpdateAnnouncementPostAsync, UpdateAnnouncementSettingsAsync, GetAnnouncementAsync, DeleteAnnouncementAsync",
+        "AnnouncementJobExecutor: background job fires at PublishDate for Scheduled announcements"
+      ],
+      "keywords": [
+        "announcement",
+        "broadcast",
+        "schedule",
+        "expire",
+        "draft",
+        "notify",
+        "publish",
+        "recipient",
+        "permission"
+      ],
+      "dddTarget": {
+        "aggregate": "AnnouncementEntity",
+        "identity": "AnnouncementPost.PostId",
+        "lifecycle": [
+          "Unpublished",
+          "Scheduled",
+          "Published",
+          "Expired"
+        ],
+        "valueObjects": [
+          "AnnouncementPostEntity",
+          "AnnouncementSetting",
+          "Recipient"
+        ],
+        "childEntities": [
+          "AnnouncementPostEntity"
+        ],
+        "invariants": [
+          "PublishDate must be before ExpireDate for a non-draft announcement",
+          "Only users with seismic.channels.announcement.manage permission can create or update",
+          "PublishStatus is derived, never set directly"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(createUser, announcementRequest)",
+            "event": "AnnouncementCreated"
+          },
+          {
+            "cmd": "UpdatePost(createUser, postRequest, origAnnouncement)",
+            "event": "AnnouncementPostUpdated"
+          },
+          {
+            "cmd": "UpdateSetting(createUser, settingRequest, origAnnouncement)",
+            "event": "AnnouncementSettingUpdated"
+          },
+          {
+            "cmd": "Delete()",
+            "event": "AnnouncementDeleted"
+          },
+          {
+            "cmd": "Acknowledge(userId)",
+            "event": "AnnouncementAcknowledged"
+          }
+        ]
+      }
+    },
+    {
+      "id": "content",
+      "name": "Content & Media",
+      "icon": "🎬",
+      "health": "anemic",
+      "operations": [
+        "ContentController: POST /contents, GET /contents/{id}, DELETE /contents/{id}",
+        "BlobStorageController: GET /blobs/{blobId}/temp-url, GET /blobs/{blobId}/download",
+        "ContentAppService: CreateContentAsync, GetContentAsync, DeleteContentAsync, GetFatCommonContentAsync",
+        "BSSAppService: GetTemporaryImageURLAsync, DownloadFileAsync"
+      ],
+      "keywords": [
+        "content",
+        "blob",
+        "file",
+        "upload",
+        "download",
+        "peer-to-peer",
+        "media",
+        "CMS",
+        "BSS",
+        "video",
+        "thumbnail"
+      ],
+      "dddTarget": {
+        "aggregate": "PeerToPeerContent",
+        "identity": "ContentId (set from external CMS on creation)",
+        "lifecycle": [
+          "Pending",
+          "Processing",
+          "Available",
+          "Unavailable"
+        ],
+        "valueObjects": [
+          "LibraryContent",
+          "WorkSpaceContent",
+          "PeerToPeerContent",
+          "ProfileContent",
+          "ArticleMetaDataType",
+          "UrlMetaDataType"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "Content must complete VFS processing before video is playable",
+          "A LibraryContent rendition must exist in CMS before it can be attached to a post",
+          "Ingested content triggers a Kafka event on eventbus.scp.content-management-application.ingested"
+        ],
+        "commands": [
+          {
+            "cmd": "IngestContent(sourceId, contentType)",
+            "event": "ContentIngested"
+          },
+          {
+            "cmd": "MarkRenditionAvailable(renditionId)",
+            "event": "ContentRenditionAvailable"
+          },
+          {
+            "cmd": "MarkVFSProcessed(video, captions, preview)",
+            "event": "ContentVFSProcessed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "social-content",
+      "name": "Social Stream",
+      "icon": "🔄",
+      "health": "good",
+      "operations": [
+        "SocialStreamController: POST /social/streams, GET /social/streams, GET /social/streams/{id}, PUT /social/streams/{id}, DELETE /social/streams/{id}",
+        "SocialStreamController: GET /social/streams/{id}/members, POST /social/streams/{id}/members",
+        "SocialStreamAppService: CreateSocialStreamAsync, UpdateSocialStreamAsync, GetSocialStreamAsync, ListSocialStreamsAsync, DeleteSocialStreamAsync"
+      ],
+      "keywords": [
+        "stream",
+        "social",
+        "RSS",
+        "compliance",
+        "network",
+        "interest",
+        "LinkedIn",
+        "Twitter",
+        "Facebook",
+        "Instagram",
+        "mandatory",
+        "keyword",
+        "filter"
+      ],
+      "dddTarget": {
+        "aggregate": "SocialStreamEntity",
+        "identity": "ChannelId (assigned by SocialSharingService on creation)",
+        "lifecycle": [
+          "Draft",
+          "Scheduled",
+          "Active",
+          "Expired",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "SocialNetworkSettings",
+          "SearchParameters",
+          "ComplianceConfigurations",
+          "RssFeed",
+          "InterestItemEntity",
+          "PermissionEntity"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "ChannelType must be PUBLIC or PRIVATE",
+          "StreamType must be set on creation",
+          "RSS feed merge on update preserves UpContentCollectionId/Name from original when not provided in request"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(createUserId, request)",
+            "event": "SocialContentCreated"
+          },
+          {
+            "cmd": "Update(userId, request)",
+            "event": "SocialContentUpdated"
+          },
+          {
+            "cmd": "MarkCompliant(complianceResponse)",
+            "event": "SocialContentComplianceApproved"
+          },
+          {
+            "cmd": "MarkViolation(violations)",
+            "event": "SocialContentComplianceViolated"
+          },
+          {
+            "cmd": "Delete()",
+            "event": "SocialContentDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "social-content",
+      "name": "Social Content",
+      "icon": "📄",
+      "health": "good",
+      "operations": [
+        "SocialContentController: POST /social/content, GET /social/content, GET /social/content/{id}, PUT /social/content/{id}, DELETE /social/content/{id}",
+        "SocialContentController: POST /social/content/{id}/compliance",
+        "SocialContentAppService: CreateSocialContentAsync, UpdateSocialContentAsync, GetSocialContentAsync, DeleteSocialContentAsync, SubmitComplianceAsync"
+      ],
+      "keywords": [
+        "social content",
+        "LinkedIn",
+        "Twitter",
+        "compliance",
+        "keyword",
+        "stream",
+        "expiration",
+        "image",
+        "article",
+        "notes",
+        "network"
+      ],
+      "dddTarget": {
+        "aggregate": "SocialContentEntity",
+        "identity": "PostId (Guid.NewGuid string, set in constructor)",
+        "lifecycle": [
+          "Draft",
+          "Scheduled",
+          "Active",
+          "Expired",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "SocialNetworkSettings",
+          "LinkedInMention",
+          "ContentResponse",
+          "Violation",
+          "Evidence",
+          "ContentCategory",
+          "ContentImage",
+          "ExtractedArticle"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "ContentType attachment must be one of the four supported types",
+          "Lang defaults to 'en' if not provided",
+          "ComplianceStatus is set from external ProofPoint evaluation result"
+        ],
+        "commands": [
+          {
+            "cmd": "Create(createUserId, request)",
+            "event": "SocialContentCreated"
+          },
+          {
+            "cmd": "Update(userId, request)",
+            "event": "SocialContentUpdated"
+          },
+          {
+            "cmd": "MarkCompliant(complianceResponse)",
+            "event": "SocialContentComplianceApproved"
+          },
+          {
+            "cmd": "MarkViolation(violations)",
+            "event": "SocialContentComplianceViolated"
+          },
+          {
+            "cmd": "Delete()",
+            "event": "SocialContentDeleted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "social-share",
+      "name": "Social Share",
+      "icon": "🚀",
+      "health": "good",
+      "operations": [
+        "SocialShareController: POST /social/shares, GET /social/shares, GET /social/shares/{id}, PUT /social/shares/{id}, DELETE /social/shares/{id}",
+        "SocialShareController: POST /social/shares/{id}/delegate, POST /social/shares/bulk",
+        "SocialShareAppService: CreateSocialShareAsync, UpdateSocialShareAsync, GetSocialShareAsync, DeleteSocialShareAsync, BulkCreateSharesAsync, DelegateSocialShareAsync"
+      ],
+      "keywords": [
+        "share",
+        "schedule",
+        "delegate",
+        "network",
+        "compliance",
+        "Twitter",
+        "LinkedIn",
+        "Facebook",
+        "Instagram",
+        "status",
+        "published",
+        "SURL"
+      ],
+      "dddTarget": {
+        "aggregate": "SocialShareEntity",
+        "identity": "Id (nodeId assigned by SocialSharingService)",
+        "lifecycle": [
+          "Draft",
+          "Scheduled",
+          "Queued",
+          "Posted",
+          "Failed",
+          "Retry",
+          "Recommended"
+        ],
+        "valueObjects": [
+          "NetworkStatusInfo",
+          "NetworkShareDetails",
+          "ShareErrorDetails",
+          "DelegateInfo",
+          "SocialNetworkSettings",
+          "Violation",
+          "LinkedInMention",
+          "ContentResponse"
+        ],
+        "childEntities": [
+          "DelegateHistory"
+        ],
+        "invariants": [
+          "DelegateRec and DelegateScheduled are mutually exclusive — both cannot be true",
+          "ScheduledTime must be provided on creation",
+          "DelegateHistory is append-only; past entries are never modified"
+        ],
+        "commands": [
+          {
+            "cmd": "InitiateShare(contentId, targetNetworks, scheduledAt)",
+            "event": "SocialShareInitiated"
+          },
+          {
+            "cmd": "MarkShared(networkResponse)",
+            "event": "SocialShareCompleted"
+          },
+          {
+            "cmd": "MarkFailed(reason)",
+            "event": "SocialShareFailed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "social-compliance",
+      "name": "Social Compliance",
+      "icon": "🔐",
+      "health": "partial",
+      "operations": [
+        "SocialComplianceController: POST /social/compliance/check, GET /social/compliance/config, PUT /social/compliance/user/{id}",
+        "DASController: GET /das/compliance (proxy to DAS social compliance config)",
+        "SocialComplianceAppService: CheckComplianceAsync, GetComplianceConfigAsync, UpdateUserComplianceStatusAsync",
+        "DASAppService: GetSocialComplianceDataAsync"
+      ],
+      "keywords": [
+        "compliance",
+        "ProofPoint",
+        "DAS",
+        "policy",
+        "violation",
+        "approval",
+        "pending",
+        "compliant",
+        "non-compliant",
+        "categorization"
+      ],
+      "dddTarget": {
+        "aggregate": "UserComplianceDetailsEntity",
+        "identity": "UserId + TenantId (composite)",
+        "lifecycle": [
+          "Pending",
+          "Approved",
+          "Rejected",
+          "Skipped"
+        ],
+        "valueObjects": [
+          "ContentResponse",
+          "Violation",
+          "ContentCategory"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "ComplianceStatus must be set by ProofPoint evaluation result",
+          "Non-compliant users require seismic.social.compliance.non-compliant.user permission to publish shares"
+        ],
+        "commands": [
+          {
+            "cmd": "CheckCompliance(shareId, content)",
+            "event": "ComplianceChecked"
+          },
+          {
+            "cmd": "UpdateComplianceStatus(userId, status)",
+            "event": "UserComplianceStatusUpdated"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "ai-generated-post",
+      "name": "Generative AI",
+      "icon": "⚙️",
+      "health": "partial",
+      "operations": [
+        "AIGeneratedPostController: POST /social/ai/generate, GET /social/ai/posts/{contentId}",
+        "GenerativeAISettingsController: GET /social/ai/settings, PUT /social/ai/settings",
+        "AIGeneratedPostAppService: GeneratePostAsync, GetGeneratedPostAsync, CacheGeneratedPostAsync",
+        "GenerativeAISettingsAppService: GetSettingsAsync, UpdateSettingsAsync"
+      ],
+      "keywords": [
+        "AI",
+        "generative",
+        "generated post",
+        "style",
+        "LLM",
+        "cache",
+        "tenant",
+        "settings",
+        "content reference",
+        "drafting",
+        "curator",
+        "publisher"
+      ],
+      "dddTarget": {
+        "aggregate": "AIGeneratedPostEntity",
+        "identity": "Id (Guid)",
+        "lifecycle": [
+          "Generating",
+          "Completed",
+          "Failed"
+        ],
+        "valueObjects": [
+          "GenerativeAIStyleEntity"
+        ],
+        "childEntities": [
+          "GenerativeAISettingsEntity"
+        ],
+        "invariants": [
+          "ContentReferenceId must be provided for generation",
+          "TenantId must be set for tenant-scoped caching",
+          "Style must reference a valid predefined style or be custom"
+        ],
+        "commands": [
+          {
+            "cmd": "Generate(streamId, prompt, style)",
+            "event": "AIPostGenerated"
+          },
+          {
+            "cmd": "Accept(targetStreamId)",
+            "event": "AIPostAccepted"
+          },
+          {
+            "cmd": "Reject(reason)",
+            "event": "AIPostRejected"
+          },
+          {
+            "cmd": "UpdateSettings(userId, styleConfig)",
+            "event": "GenerativeAISettingsUpdated"
+          }
+        ]
+      }
+    },
+    {
+      "id": "social-user-profile",
+      "name": "User Social Profile",
+      "icon": "👤",
+      "health": "partial",
+      "operations": [
+        "UserDetailsController: GET /social/users/{id}, POST /social/users/batch",
+        "UserPreferencesController: PUT /social/users/{id}/preferences, PUT /social/users/{id}/onboarding, PUT /social/users/{id}/interests",
+        "UserDetailsAppService: GetFullUserDetailsAsync, GetBatchUserDetailsAsync, UpsertUserPreferenceDetailsAsync, UpdateOnboardingDetailsAsync, UpdateInterestDetailsAsync"
+      ],
+      "keywords": [
+        "user",
+        "preferences",
+        "onboarding",
+        "social network",
+        "stream order",
+        "interest",
+        "compliance",
+        "profile",
+        "JSONB",
+        "page type"
+      ],
+      "dddTarget": {
+        "aggregate": "UserDetailsEntity",
+        "identity": "UserId (Guid) scoped to TenantId",
+        "lifecycle": [
+          "Active",
+          "Deactivated"
+        ],
+        "valueObjects": [
+          "UserPreferenceDetailsEntity",
+          "UserOnboardingDetailsEntity",
+          "UserInterestDetailsEntity",
+          "SocialNetworkPreferencesEntity"
+        ],
+        "childEntities": [
+          "UserComplianceDetailsEntity"
+        ],
+        "invariants": [
+          "StreamOrder must not contain duplicate stream IDs",
+          "SocialNetworkPreference PageType must be a valid SocialNetworkPageType enum value",
+          "DefaultVisibility must be a valid NetworkDefaultVisibility enum value"
+        ],
+        "commands": [
+          {
+            "cmd": "Upsert(userId, detailsRequest)",
+            "event": "UserSocialProfileUpdated"
+          },
+          {
+            "cmd": "UpdatePreferences(preferences)",
+            "event": "UserPreferencesUpdated"
+          },
+          {
+            "cmd": "RecordComplianceConsent(consentVersion)",
+            "event": "ComplianceConsentRecorded"
+          },
+          {
+            "cmd": "Deactivate()",
+            "event": "UserSocialProfileDeactivated"
+          }
+        ]
+      }
+    },
+    {
+      "id": "platform-integrations",
+      "name": "Platform Integrations",
+      "icon": "⚙️",
+      "health": "anemic",
+      "operations": [
+        "EntitlementController: GET /entitlements/users/{userId}/roles",
+        "FMSController: GET /fms/features/{tenantId}, GET /fms/features/{tenantId}/{feature}",
+        "EntitlementAppService: GetUserRolesAsync",
+        "FMSAppService: GetFeaturesAsync, GetFeatureAsync"
+      ],
+      "keywords": [
+        "entitlement",
+        "role",
+        "permission",
+        "feature",
+        "toggle",
+        "FMS",
+        "tenant",
+        "authorization"
+      ],
+      "dddTarget": {
+        "aggregate": "PlatformConfigurationProxy",
+        "identity": "tenantId + userId",
+        "lifecycle": [],
+        "valueObjects": [],
+        "childEntities": [],
+        "invariants": [],
+        "commands": [
+          {
+            "cmd": "GetUserRolesAsync(tenantId, userId)",
+            "event": "none"
+          },
+          {
+            "cmd": "GetFeaturesAsync(tenantNameOrId)",
+            "event": "none"
+          }
+        ]
+      }
+    },
+    {
+      "id": "entitlement",
+      "name": "Entitlement",
+      "icon": "🔐",
+      "health": "anemic",
+      "operations": [
+        "EntitlementController.GetUserRolesAsync",
+        "EntitlementAppService.GetUserRolesAsync",
+        "EntitlementServiceProvider.GetUserRolesAsync"
+      ],
+      "keywords": [
+        "entitlement",
+        "roles",
+        "permissions",
+        "access-control",
+        "scopes"
+      ],
+      "dddTarget": {
+        "aggregate": "UserRole",
+        "identity": "UserId (Guid)",
+        "lifecycle": [
+          "Active"
+        ],
+        "valueObjects": [],
+        "childEntities": [],
+        "invariants": [
+          "User must hold at least one channel role to perform write operations on channel resources"
+        ],
+        "commands": [
+          {
+            "cmd": "Check(userId, permission)",
+            "event": null
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "blob-storage-integration",
+      "name": "Blob Storage Integration",
+      "icon": "📦",
+      "health": "anemic",
+      "operations": [
+        "BlobStorageController.UploadBlob",
+        "BlobStorageController.GetBlob",
+        "BlobStorageController.DeleteBlob",
+        "BSSAppService.UploadAsync",
+        "BSSAppService.GetAsync"
+      ],
+      "keywords": [
+        "blob",
+        "bss",
+        "upload",
+        "storage",
+        "binary",
+        "image"
+      ],
+      "dddTarget": {
+        "aggregate": "BlobRecord",
+        "identity": "blobId (Guid)",
+        "lifecycle": [
+          "Active"
+        ],
+        "valueObjects": [],
+        "childEntities": [],
+        "invariants": [],
+        "commands": [
+          {
+            "cmd": "Upload(blobData)",
+            "event": null
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "digital-asset-integration",
+      "name": "Digital Asset Integration",
+      "icon": "📦",
+      "health": "anemic",
+      "operations": [
+        "DASController.GetAsset",
+        "DASController.SearchAssets",
+        "DASAppService.GetAssetAsync",
+        "DASAppService.SearchAssetsAsync"
+      ],
+      "keywords": [
+        "das",
+        "digital asset",
+        "asset",
+        "metadata"
+      ],
+      "dddTarget": {
+        "aggregate": "DigitalAssetRecord",
+        "identity": "assetId (Guid)",
+        "lifecycle": [
+          "Active"
+        ],
+        "valueObjects": [],
+        "childEntities": [],
+        "invariants": [],
+        "commands": [
+          {
+            "cmd": "Fetch(assetId)",
+            "event": null
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "file-management-integration",
+      "name": "File Management Integration",
+      "icon": "📁",
+      "health": "anemic",
+      "operations": [
+        "FMSController.GetFile",
+        "FMSController.UploadFile",
+        "FMSController.DeleteFile",
+        "FMSAppService.GetFileAsync",
+        "FMSAppService.UploadFileAsync"
+      ],
+      "keywords": [
+        "fms",
+        "file",
+        "upload",
+        "download",
+        "management"
+      ],
+      "dddTarget": {
+        "aggregate": "FileRecord",
+        "identity": "fileId (Guid)",
+        "lifecycle": [
+          "Active"
+        ],
+        "valueObjects": [],
+        "childEntities": [],
+        "invariants": [],
+        "commands": [
+          {
+            "cmd": "Upload(fileData)",
+            "event": null
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    },
+    {
+      "id": "generative-ai-settings",
+      "name": "Generative AI Settings",
+      "icon": "⚙️",
+      "health": "anemic",
+      "operations": [
+        "GenerativeAISettingsController.GetSettings",
+        "GenerativeAISettingsController.CreateSettings",
+        "GenerativeAISettingsController.UpdateSettings",
+        "GenerativeAISettingsController.DeleteSettings",
+        "GenerativeAISettingsAppService.GetSettingsAsync",
+        "GenerativeAISettingsAppService.UpdateSettingsAsync"
+      ],
+      "keywords": [
+        "generativeAI",
+        "settings",
+        "style",
+        "enforcement",
+        "curator",
+        "publisher",
+        "autoGenerate",
+        "predefinedStyles"
+      ],
+      "dddTarget": {
+        "aggregate": "GenerativeAISettingsEntity",
+        "identity": "id (Guid)",
+        "lifecycle": [
+          "Active",
+          "Deleted"
+        ],
+        "valueObjects": [
+          "GenerativeAIStyleEntity"
+        ],
+        "childEntities": [],
+        "invariants": [
+          "DefaultStyleIndex must reference a valid index in PredefinedStyles when set",
+          "StyleEnforcementMode must be one of: pre_defined, user_defined, both"
+        ],
+        "commands": [
+          {
+            "cmd": "UpdateSettings(tenantId, request)",
+            "event": "GenerativeAISettingsUpdated"
+          },
+          {
+            "cmd": "DeleteSettings(tenantId)",
+            "event": "GenerativeAISettingsDeleted"
+          }
+        ]
+      },
+      "_retainedFromPrevious": true
+    }
+  ],
+  "workflows": [
+    {
+      "id": "create-and-publish-post",
+      "name": "Create and Publish Post",
+      "domains": [
+        "channel",
+        "post",
+        "content-media"
+      ],
+      "steps": [
+        {
+          "label": "POST /posts — post creation request with attachments",
+          "type": "api"
+        },
+        {
+          "label": "ChannelAppService: verify user is member of target channels",
+          "type": "domain"
+        },
+        {
+          "label": "PostEntity: construct, validate attachment content types",
+          "type": "domain"
+        },
+        {
+          "label": "ContentService (CMS): enrich attachment metadata",
+          "type": "external"
+        },
+        {
+          "label": "PostService: persist PostEntity to PostgreSQL",
+          "type": "domain"
+        },
+        {
+          "label": "UserChannelsService: update channel LastPostTime",
+          "type": "domain"
+        },
+        {
+          "label": "NotificationEventDispatcher: queue post-created notification",
+          "type": "background"
+        }
+      ]
+    },
+    {
+      "id": "schedule-and-publish-announcement",
+      "name": "Schedule and Publish Announcement",
+      "domains": [
+        "announcement",
+        "channel",
+        "user-social-profile"
+      ],
+      "steps": [
+        {
+          "label": "POST /announcements — create announcement request",
+          "type": "api"
+        },
+        {
+          "label": "EntitlementCheck: verify seismic.channels.announcement.manage permission",
+          "type": "external"
+        },
+        {
+          "label": "AnnouncementEntity: construct with computed PublishStatus",
+          "type": "domain"
+        },
+        {
+          "label": "AnnouncementService: resolve recipient users from channel membership",
+          "type": "domain"
+        },
+        {
+          "label": "AnnouncementService: persist to PostgreSQL",
+          "type": "domain"
+        },
+        {
+          "label": "NotificationEventDispatcher: send immediate notification if status=Published",
+          "type": "background"
+        },
+        {
+          "label": "AnnouncementJobExecutor (Hangfire): fire at PublishDate for Scheduled announcements",
+          "type": "background"
+        }
+      ]
+    },
+    {
+      "id": "schedule-social-share-with-compliance-check",
+      "name": "Schedule Social Share with Compliance Check",
+      "domains": [
+        "social-content",
+        "social-compliance",
+        "social-share"
+      ],
+      "steps": [
+        {
+          "label": "POST /social/shares — create social share request",
+          "type": "api"
+        },
+        {
+          "label": "SocialShareEntity: construct with delegate validation (mutual exclusivity check)",
+          "type": "domain"
+        },
+        {
+          "label": "DASServiceProvider: fetch social compliance configuration",
+          "type": "external"
+        },
+        {
+          "label": "SocialComplianceAppService: evaluate compliance feature flag via FMS",
+          "type": "violation"
+        },
+        {
+          "label": "ProofPoint: submit content for compliance evaluation",
+          "type": "external"
+        },
+        {
+          "label": "SocialShareEntity: update ComplianceStatus from ProofPoint result",
+          "type": "domain"
+        },
+        {
+          "label": "SocialSharingServiceProvider: register share schedule externally",
+          "type": "external"
+        },
+        {
+          "label": "SocialShareService: persist to PostgreSQL",
+          "type": "domain"
+        }
+      ]
+    },
+    {
+      "id": "user-deactivation-via-ums-kafka-event",
+      "name": "User Deactivation via UMS Kafka Event",
+      "domains": [
+        "user-social-profile",
+        "channel",
+        "social-share"
+      ],
+      "steps": [
+        {
+          "label": "UMSEventConsumer: receive user.deactivated Avro Kafka event",
+          "type": "kafka"
+        },
+        {
+          "label": "UserChannelsService: remove user from all channel memberships",
+          "type": "domain"
+        },
+        {
+          "label": "SocialShareService: cancel all pending social shares for user",
+          "type": "domain"
+        },
+        {
+          "label": "UserComplianceDetailsEntity: delete social compliance record",
+          "type": "domain"
+        },
+        {
+          "label": "SocialSharingServiceProvider: notify social sharing service of user deactivation",
+          "type": "external"
+        },
+        {
+          "label": "Direct DB calls bypass aggregate lifecycle — no domain events raised",
+          "type": "violation"
+        }
+      ]
+    }
+  ],
+  "integrations": {
+    "kafkaIn": [
+      "ums.user.event",
+      "vfs.content.vfs-processed"
+    ],
+    "kafkaOut": [
+      "channel.content.ingested",
+      "channel.content.updated"
+    ],
+    "http": [
+      "UMS",
+      "CMS",
+      "BSS",
+      "FMS",
+      "DAS",
+      "VFS",
+      "CAS",
+      "SocialSharingService",
+      "ProofPoint",
+      "ProofPointNative",
+      "EntitlementService"
+    ],
+    "background": [
+      "UMSEventConsumer",
+      "ContentVFSProcessedEventConsumer",
+      "NotificationEventConsumer",
+      "NotificationEventDispatcher",
+      "AnnouncementJobExecutor",
+      "PostChannelNamePopulationJobExecutor",
+      "MigrationHostedService"
+    ]
+  },
+  "coverageCheck": {
+    "found": 17,
+    "controllers": 19,
+    "appServices": 32,
+    "entities": 20,
+    "coveragePct": 53
+  }
+}

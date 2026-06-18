@@ -1362,7 +1362,7 @@
   "domains": [
     {
       "id": "content-engagement",
-      "name": "File & Versioning",
+      "name": "File",
       "icon": "📄",
       "health": "anemic",
       "operations": [
