@@ -17,18 +17,18 @@
       "UserChannels (membership tracking)"
     ],
     "dependsOn": [
-      "CMS — channel/post/comment/announcement/social persistence",
-      "UMS — user identity, groups, entitlements",
-      "BSS — blob storage upload URLs",
-      "FMS — feature flag reads",
-      "DAS — social compliance configuration and analytics",
-      "VFS — video upload and processing",
-      "CAS — content SAS URL and rendition generation",
-      "Notification Service — push notification delivery",
-      "ProofPoint — social post compliance scanning",
-      "ProofPoint Native — native account deprovisioning",
-      "SocialSharing Service — cross-network social share posting",
-      "Matrix — tenant lifecycle and region resolution"
+      "CMS \u2014 channel/post/comment/announcement/social persistence",
+      "UMS \u2014 user identity, groups, entitlements",
+      "BSS \u2014 blob storage upload URLs",
+      "FMS \u2014 feature flag reads",
+      "DAS \u2014 social compliance configuration and analytics",
+      "VFS \u2014 video upload and processing",
+      "CAS \u2014 content SAS URL and rendition generation",
+      "Notification Service \u2014 push notification delivery",
+      "ProofPoint \u2014 social post compliance scanning",
+      "ProofPoint Native \u2014 native account deprovisioning",
+      "SocialSharing Service \u2014 cross-network social share posting",
+      "Matrix \u2014 tenant lifecycle and region resolution"
     ],
     "publishes": [
       "eventbus.scp.content-management-application.ingested"
@@ -75,7 +75,7 @@
     {
       "id": 5,
       "title": "ICms3Manager exposes a god-interface spanning all aggregates",
-      "detail": "ICms3Manager has over 60 methods covering channels, posts, comments, announcements, social content, social shares, social streams, and content files. A single interface violates the Interface Segregation Principle — any domain service taking ICms3Manager can access persistence for aggregates it does not own. It should be split per aggregate (IChannelRepository, IPostRepository, etc.), and the 'manager' naming suggests an anti-pattern.",
+      "detail": "ICms3Manager has over 60 methods covering channels, posts, comments, announcements, social content, social shares, social streams, and content files. A single interface violates the Interface Segregation Principle \u2014 any domain service taking ICms3Manager can access persistence for aggregates it does not own. It should be split per aggregate (IChannelRepository, IPostRepository, etc.), and the 'manager' naming suggests an anti-pattern.",
       "file": "ICms3Manager.cs",
       "severity": "P1",
       "category": "Layer violation"
@@ -133,18 +133,15 @@
     {
       "id": "channel",
       "name": "Channel",
-      "icon": "🤝",
+      "icon": "\ud83e\udd1d",
       "health": "good",
       "operations": [
-        "CreateChannelAsync",
-        "UpdateChannelPermissionAsync",
-        "JoinChannelAsync",
-        "LeaveChannelAsync",
-        "AddRequestAsync",
-        "ApproveAsync",
-        "DenyAsync",
-        "UpdateChannelVisitAsync",
-        "DeleteChannelAsync"
+        "Create channel",
+        "Update channel permissions",
+        "Join / leave channel",
+        "Request / approve / deny membership",
+        "Track channel visits",
+        "Delete channel"
       ],
       "keywords": [
         "ChannelEntity",
@@ -197,18 +194,14 @@
     {
       "id": "post",
       "name": "Post",
-      "icon": "📄",
+      "icon": "\ud83d\udcc4",
       "health": "good",
       "operations": [
-        "CreatePostAsync",
-        "UpdatePostAsync",
-        "DeletePostAsync",
-        "GetPostDetailAsync",
-        "FeaturePostAsync",
-        "UnFeaturePostAsync",
-        "AddReactionAsync",
-        "RemoveReactionAsync",
-        "GetDraftPostsAsync"
+        "Create / update / delete post",
+        "Get post detail",
+        "Feature / unfeature post",
+        "Add / remove reaction",
+        "Get draft posts"
       ],
       "keywords": [
         "PostEntity",
@@ -254,15 +247,12 @@
     {
       "id": "comment",
       "name": "Comment",
-      "icon": "📄",
+      "icon": "\ud83d\udcc4",
       "health": "good",
       "operations": [
-        "CreateCommentAsync",
-        "UpdateCommentAsync",
-        "DeleteCommentAsync",
-        "AddReactionAsync",
-        "RemoveReactionAsync",
-        "GetReactionsByCommentIdAsync"
+        "Create / update / delete comment",
+        "Add / remove reaction",
+        "Get reactions by comment"
       ],
       "keywords": [
         "CommentEntity",
@@ -306,15 +296,13 @@
     {
       "id": "announcement",
       "name": "Announcement",
-      "icon": "🚀",
+      "icon": "\ud83d\ude80",
       "health": "good",
       "operations": [
-        "CreateAnnouncementAsync",
-        "UpdateAnnouncementPostAsync",
-        "UpdateAnnouncementSettingAsync",
-        "DeleteAnnouncementAsync",
-        "GetUserAnnouncementsAsync",
-        "FeatureAnnouncementAsync"
+        "Create / update / delete announcement",
+        "Update announcement settings",
+        "Get user announcements",
+        "Feature announcement"
       ],
       "keywords": [
         "AnnouncementEntity",
@@ -357,15 +345,12 @@
     {
       "id": "social-stream",
       "name": "Social Stream",
-      "icon": "🔄",
+      "icon": "\ud83d\udd04",
       "health": "good",
       "operations": [
-        "CreateSocialStreamAsync",
-        "UpdateSocialStreamAsync",
-        "DeleteSocialStreamAsync",
-        "AddMemberToSocialStreamAsync",
-        "RemoveMemberFromSocialStreamAsync",
-        "ListSocialStreamsAsync"
+        "Create / update / delete social stream",
+        "Add / remove stream members",
+        "List social streams"
       ],
       "keywords": [
         "SocialStreamEntity",
@@ -415,15 +400,12 @@
     {
       "id": "social-content",
       "name": "Social Content",
-      "icon": "📄",
+      "icon": "\ud83d\udcc4",
       "health": "partial",
       "operations": [
-        "CreateSocialContentAsync",
-        "BatchCreateSocialContentAsync",
-        "UpdateSocialContentAsync",
-        "PatchUpdateSocialContentAsync",
-        "DeleteSocialContentAsync",
-        "SearchSocialContentAsync"
+        "Create / batch-create social content",
+        "Update / patch / delete social content",
+        "Search social content"
       ],
       "keywords": [
         "SocialContentEntity",
@@ -467,16 +449,12 @@
     {
       "id": "social-share",
       "name": "Social Share",
-      "icon": "🚀",
+      "icon": "\ud83d\ude80",
       "health": "good",
       "operations": [
-        "CreateSocialShareAsync",
-        "UpdateSocialShareAsync",
-        "PatchUpdateSocialShareAsync",
-        "DeleteSocialShareAsync",
-        "GetSocialSharesAsync",
-        "SearchSocialSharesAsync",
-        "SearchSocialSharesForDelegateAsync"
+        "Create / update / delete social share",
+        "Get / search social shares",
+        "Search shares for delegate"
       ],
       "keywords": [
         "SocialShareEntity",
@@ -531,11 +509,11 @@
     {
       "id": "user-details",
       "name": "User Details",
-      "icon": "👤",
+      "icon": "\ud83d\udc64",
       "health": "partial",
       "operations": [
-        "GetUserDetailsAsync",
-        "UpsertUserDetailsAsync"
+        "Get user details",
+        "Upsert user details"
       ],
       "keywords": [
         "UserDetailsEntity",
@@ -565,14 +543,13 @@
     {
       "id": "generative-ai",
       "name": "Generative AI",
-      "icon": "⚙️",
+      "icon": "\u2699\ufe0f",
       "health": "anemic",
       "operations": [
-        "GetGenerativeAISettingsAsync",
-        "UpsertGenerativeAISettingsAsync",
-        "GeneratePostAsync",
-        "BatchGeneratePostAsync",
-        "GetAIGeneratedPostAsync"
+        "Get / update generative AI settings",
+        "Generate post",
+        "Batch generate posts",
+        "Get AI-generated post"
       ],
       "keywords": [
         "GenerativeAISettingsEntity",
@@ -601,13 +578,10 @@
     {
       "id": "content",
       "name": "Content",
-      "icon": "📄",
+      "icon": "\ud83d\udcc4",
       "health": "partial",
       "operations": [
-        "CreateContentAsync",
-        "DeleteContentAsync",
-        "GetContentAsync",
-        "UpdateContentAsync"
+        "Create / get / update / delete content"
       ],
       "keywords": [
         "PeerToPeerContent",
@@ -636,11 +610,11 @@
     {
       "id": "user-announcements",
       "name": "User Announcements",
-      "icon": "👤",
+      "icon": "\ud83d\udc64",
       "health": "partial",
       "operations": [
-        "GetUserAnnouncementsAsync",
-        "MarkAnnouncementReadAsync"
+        "Get user announcements",
+        "Mark announcement as read"
       ],
       "keywords": [
         "UserAnnouncements",
@@ -681,19 +655,19 @@
           "type": "api"
         },
         {
-          "label": "PostAppService.CreatePostAsync — validate draft limit and permission",
+          "label": "PostAppService.CreatePostAsync \u2014 validate draft limit and permission",
           "type": "domain"
         },
         {
-          "label": "UserChannelsService.GetUserChannelAsync — fetch channel membership",
+          "label": "UserChannelsService.GetUserChannelAsync \u2014 fetch channel membership",
           "type": "domain"
         },
         {
-          "label": "PostEntity constructor — enforce attachment type rules",
+          "label": "PostEntity constructor \u2014 enforce attachment type rules",
           "type": "domain"
         },
         {
-          "label": "PostService.CreatePostAsync — persist and update lastPostTime",
+          "label": "PostService.CreatePostAsync \u2014 persist and update lastPostTime",
           "type": "domain"
         },
         {
@@ -716,15 +690,15 @@
           "type": "api"
         },
         {
-          "label": "PostAppService.FeaturePostAsync — check MANAGE permission",
+          "label": "PostAppService.FeaturePostAsync \u2014 check MANAGE permission",
           "type": "domain"
         },
         {
-          "label": "ItemsService.GetOverlappedFeaturedItemsByChannel — query overlap window",
+          "label": "ItemsService.GetOverlappedFeaturedItemsByChannel \u2014 query overlap window",
           "type": "domain"
         },
         {
-          "label": "ItemsService.ExceedsOverlapLimit — enforce 4-item invariant",
+          "label": "ItemsService.ExceedsOverlapLimit \u2014 enforce 4-item invariant",
           "type": "domain"
         },
         {
@@ -732,7 +706,7 @@
           "type": "external"
         },
         {
-          "label": "NotificationEventDispatcher.Send — enqueue feature_post notification",
+          "label": "NotificationEventDispatcher.Send \u2014 enqueue feature_post notification",
           "type": "background"
         }
       ]
@@ -749,15 +723,15 @@
           "type": "api"
         },
         {
-          "label": "ChannelAppService.ApproveAsync — verify MANAGE permission",
+          "label": "ChannelAppService.ApproveAsync \u2014 verify MANAGE permission",
           "type": "domain"
         },
         {
-          "label": "ChannelEntity.GetRequest — retrieve in-memory request",
+          "label": "ChannelEntity.GetRequest \u2014 retrieve in-memory request",
           "type": "domain"
         },
         {
-          "label": "PermissionEntity.AddMember / UpdateMember — mutate in-memory permission",
+          "label": "PermissionEntity.AddMember / UpdateMember \u2014 mutate in-memory permission",
           "type": "domain"
         },
         {
@@ -783,11 +757,11 @@
           "type": "api"
         },
         {
-          "label": "SocialShareAppService.CreateSocialShareAsync — validate schedule conflict, delegation",
+          "label": "SocialShareAppService.CreateSocialShareAsync \u2014 validate schedule conflict, delegation",
           "type": "domain"
         },
         {
-          "label": "SocialShareEntity constructor — enforce delegate mutual-exclusivity",
+          "label": "SocialShareEntity constructor \u2014 enforce delegate mutual-exclusivity",
           "type": "domain"
         },
         {
@@ -795,7 +769,7 @@
           "type": "external"
         },
         {
-          "label": "SocialShareAppService.TryProcessCreateSharingWithComplianceAsync — call ProofPoint or SocialSharing provider",
+          "label": "SocialShareAppService.TryProcessCreateSharingWithComplianceAsync \u2014 call ProofPoint or SocialSharing provider",
           "type": "external"
         },
         {
@@ -813,19 +787,19 @@
       ],
       "steps": [
         {
-          "label": "UMSEventConsumer.ExecuteAsync — receive Kafka message",
+          "label": "UMSEventConsumer.ExecuteAsync \u2014 receive Kafka message",
           "type": "background"
         },
         {
-          "label": "UMSEventConsumer.IsSocialComplianceFeatureEnabledAsync — HTTP call to FMS inside background consumer",
+          "label": "UMSEventConsumer.IsSocialComplianceFeatureEnabledAsync \u2014 HTTP call to FMS inside background consumer",
           "type": "violation"
         },
         {
-          "label": "UMSEventConsumer.GetDeprovisionAuthTokenAsync — HTTP call to DAS inside background consumer",
+          "label": "UMSEventConsumer.GetDeprovisionAuthTokenAsync \u2014 HTTP call to DAS inside background consumer",
           "type": "violation"
         },
         {
-          "label": "UMSEventConsumer.HandleUserDeprovisionAsync — HTTP call to UMS then ProofPoint Native",
+          "label": "UMSEventConsumer.HandleUserDeprovisionAsync \u2014 HTTP call to UMS then ProofPoint Native",
           "type": "external"
         }
       ]
@@ -842,7 +816,7 @@
           "type": "api"
         },
         {
-          "label": "ContentAppService → ContentService.CreateContentAsync",
+          "label": "ContentAppService \u2192 ContentService.CreateContentAsync",
           "type": "domain"
         },
         {
@@ -850,7 +824,7 @@
           "type": "external"
         },
         {
-          "label": "Fire-and-forget Task.Run — resolve tenant context from DI scope",
+          "label": "Fire-and-forget Task.Run \u2014 resolve tenant context from DI scope",
           "type": "violation"
         },
         {
@@ -858,11 +832,11 @@
           "type": "external"
         },
         {
-          "label": "IContentIngestedEventSender.SendToEventBus — publish Kafka event",
+          "label": "IContentIngestedEventSender.SendToEventBus \u2014 publish Kafka event",
           "type": "kafka"
         },
         {
-          "label": "ContentVFSProcessedEventConsumer — Kafka consumer updates CMS thumbnail",
+          "label": "ContentVFSProcessedEventConsumer \u2014 Kafka consumer updates CMS thumbnail",
           "type": "background"
         }
       ]
@@ -879,19 +853,19 @@
           "type": "api"
         },
         {
-          "label": "ChannelAppService.UpdateChannelPermissionAsync — parse and validate request",
+          "label": "ChannelAppService.UpdateChannelPermissionAsync \u2014 parse and validate request",
           "type": "domain"
         },
         {
-          "label": "PermissionEntity.BulkUpdate / AddMember mutations — in-memory",
+          "label": "PermissionEntity.BulkUpdate / AddMember mutations \u2014 in-memory",
           "type": "domain"
         },
         {
-          "label": "ChannelService.AddMemberAsync / UpdateMemberAsync / RemoveRequestAsync — parallel CMS calls per pending request (potential N+1)",
+          "label": "ChannelService.AddMemberAsync / UpdateMemberAsync / RemoveRequestAsync \u2014 parallel CMS calls per pending request (potential N+1)",
           "type": "violation"
         },
         {
-          "label": "Task.Run ReloadChannelsCache — fire-and-forget Redis invalidation",
+          "label": "Task.Run ReloadChannelsCache \u2014 fire-and-forget Redis invalidation",
           "type": "background"
         }
       ]

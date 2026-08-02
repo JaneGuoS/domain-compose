@@ -1854,6 +1854,7 @@ function App(){
   const[isNewDddDomain,setIsNewDddDomain]=useState(null);
   const[editingId,setEditingId]=useState(null); // inline card edit
   const[toasts,setToasts]=useState([]);
+  const loadingFor=useRef('');
 
   const showToast=(msg,type='success')=>{
     const id=Date.now();
@@ -1862,10 +1863,14 @@ function App(){
   };
 
   const loadService=async name=>{
-    setLoading(true);setImpact(null);setSelDomain(null);setSelAgg(null);setSelWf(null);setEditedTargets({});setCtxMapStatus('idle');
-    const r=await fetch(`${API}/api/analyze/${name}`);
-    setData(await r.json());
+    loadingFor.current=name;
     setActiveSvc(name);
+    setData(null);
+    setLoading(true);setImpact(null);setSelDomain(null);setSelAgg(null);setSelWf(null);setEditedTargets({});setCtxMapStatus('idle');setEditingId(null);
+    const r=await fetch(`${API}/api/analyze/${name}`);
+    const json=await r.json();
+    if(loadingFor.current!==name)return;
+    setData(json);
     setLoading(false);
   };
 
